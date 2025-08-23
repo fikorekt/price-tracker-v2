@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3Dcim PriceTracker Pro - Canlı Fiyat Karşılaştırma</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #22c55e;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --border: #334155;
+            --border-light: #475569;
+            --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            --green-bg: #22c55e;
+            --red-bg: #ef4444;
+            --yellow-bg: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-light);
+        }
+
+        /* Upload Section */
+        .upload-section {
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: var(--bg-secondary);
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        /* Comparison Table */
+        .comparison-section {
+            padding: 2rem 0;
+            display: none;
+        }
+
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .auto-refresh-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: rgba(51, 65, 85, 0.3);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .search-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+            background: rgba(51, 65, 85, 0.3);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            min-width: 250px;
+        }
+
+        .search-box:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        .search-box i.fa-search {
+            color: var(--text-muted);
+            margin-right: 0.5rem;
+        }
+
+        .search-box input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            flex: 1;
+            padding: 0.25rem 0;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-box button {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            margin-left: 0.5rem;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .search-box.has-text button {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .search-box button:hover {
+            background: rgba(71, 85, 105, 0.3);
+            color: var(--text-primary);
+        }
+
+        .search-results {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .search-results.filtered {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .product-row {
+            transition: all 0.3s ease;
+        }
+
+        .product-row.hidden {
+            display: none;
+        }
+
+        .product-row.highlighted td:first-child {
+            background: rgba(99, 102, 241, 0.2);
+            border-left: 3px solid var(--primary);
+        }
+
+        .btn-refresh {
+            background: var(--secondary);
+            color: white;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-refresh:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .btn-refresh:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-refresh.loading {
+            background: var(--warning);
+        }
+
+        .btn-refresh.loading i {
+            animation: spin 1s linear infinite;
+        }
+
+        .refresh-interval select {
+            background: rgba(51, 65, 85, 0.5);
+            color: var(--text-primary);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            border-radius: 4px;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.85rem;
+        }
+
+        .comparison-table-container {
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 8px;
+            border: 1px solid rgba(51, 65, 85, 0.4);
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            max-width: 1200px;
+            margin: 0 auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        .comparison-table th {
+            background: rgba(51, 65, 85, 0.6);
+            color: var(--text-primary);
+            padding: 0.6rem 0.4rem;
+            text-align: center;
+            font-weight: 500;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-size: 0.75rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .comparison-table th:first-child {
+            text-align: left;
+            min-width: 160px;
+            max-width: 180px;
+        }
+
+        .comparison-table td {
+            padding: 0.4rem 0.3rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.2);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .comparison-table td:first-child {
+            text-align: left;
+            font-weight: 400;
+            background: rgba(51, 65, 85, 0.4);
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            min-width: 160px;
+            max-width: 180px;
+            word-wrap: break-word;
+            font-size: 0.75rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .price-cell {
+            font-weight: 500;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            margin: 1px;
+            padding: 0.3rem 0.2rem;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .price-cell.best-price {
+            background: var(--green-bg);
+            color: white;
+            box-shadow: 0 1px 4px rgba(34, 197, 94, 0.3);
+        }
+
+        .price-cell.worst-price {
+            background: var(--red-bg);
+            color: white;
+            box-shadow: 0 1px 4px rgba(239, 68, 68, 0.3);
+        }
+
+        .price-cell.no-price {
+            background: rgba(15, 23, 42, 0.5);
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .price-cell.updating {
+            animation: updating 1.5s infinite;
+        }
+
+        @keyframes updating {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .price-change {
+            font-size: 0.65rem;
+            margin-top: 0.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.2rem;
+        }
+
+        .price-change.positive {
+            color: var(--danger);
+        }
+
+        .price-change.negative {
+            color: var(--success);
+        }
+
+        .last-updated {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        /* Statistics */
+        .stats-section {
+            display: none;
+            padding: 2rem 0;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(51, 65, 85, 0.3);
+            border-radius: 8px;
+            padding: 1.2rem;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        /* Progress */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-content {
+            text-align: center;
+            max-width: 500px;
+            padding: 2rem;
+        }
+
+        .versus-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .versus-side {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .versus-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .versus-icon.products {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            animation: pulseLeft 2s ease-in-out infinite;
+        }
+
+        .versus-icon.competitors {
+            background: linear-gradient(135deg, #10b981, #06d6a0);
+            animation: pulseRight 2s ease-in-out infinite;
+        }
+
+        .versus-vs {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+            text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            animation: vsGlow 1.5s ease-in-out infinite alternate;
+        }
+
+        .circular-progress {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 2rem auto;
+        }
+
+        .circular-progress svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .circular-progress .bg-circle {
+            fill: none;
+            stroke: var(--bg-tertiary);
+            stroke-width: 8;
+        }
+
+        .circular-progress .progress-circle {
+            fill: none;
+            stroke: url(#progressGradient);
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 314.16;
+            stroke-dashoffset: 314.16;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .progress-percentage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .loading-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .loading-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .current-product {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            max-width: 400px;
+        }
+
+        .current-product-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .current-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        @keyframes pulseLeft {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+            50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+        }
+
+        @keyframes pulseRight {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+        }
+
+        @keyframes vsGlow {
+            0% { text-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
+            100% { text-shadow: 0 0 30px rgba(99, 102, 241, 0.8), 0 0 40px rgba(99, 102, 241, 0.3); }
+        }
+
+        .battle-sparks {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            pointer-events: none;
+        }
+
+        .spark {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--warning);
+            border-radius: 50%;
+            animation: sparkle 1.5s ease-in-out infinite;
+        }
+
+        .spark:nth-child(1) { top: 20%; left: 20%; animation-delay: 0s; }
+        .spark:nth-child(2) { top: 20%; right: 20%; animation-delay: 0.3s; }
+        .spark:nth-child(3) { bottom: 20%; left: 20%; animation-delay: 0.6s; }
+        .spark:nth-child(4) { bottom: 20%; right: 20%; animation-delay: 0.9s; }
+        .spark:nth-child(5) { top: 50%; left: 10%; animation-delay: 0.15s; }
+        .spark:nth-child(6) { top: 50%; right: 10%; animation-delay: 0.45s; }
+
+        @keyframes sparkle {
+            0%, 100% { opacity: 0; transform: scale(0); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            max-width: 400px;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-color: var(--success);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .notification.error {
+            border-color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .nav-controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .search-box {
+                min-width: 200px;
+            }
+
+            .comparison-table-container {
+                margin: 0 -1rem;
+                border-radius: 0;
+            }
+
+            .comparison-table {
+                font-size: 0.75rem;
+            }
+
+            .comparison-table th,
+            .comparison-table td {
+                padding: 0.4rem 0.2rem;
+            }
+
+            .comparison-table td:first-child {
+                min-width: 120px;
+                max-width: 150px;
+            }
+            
+            .company-header {
+                min-width: 80px;
+                max-width: 100px;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 65vh;
+        }
+
+        .company-header {
+            writing-mode: horizontal-tb;
+            text-align: center;
+            min-width: 90px;
+            max-width: 110px;
+            font-weight: 500;
+        }
+
+        .update-indicator {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--warning);
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="nav container">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                3Dcim PriceTracker Pro
+            </div>
+            <div class="nav-controls">
+                <div class="live-indicator">
+                    <div class="live-dot"></div>
+                    <span>Canlı Takip</span>
+                </div>
+                <button type="button" class="btn btn-secondary" id="uploadNewExcelBtn" style="display: none;">
+                    <i class="fas fa-upload"></i>
+                    Yeni Excel Yükle
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Upload Section -->
+        <section class="upload-section container" id="uploadSection">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <h2>Excel Dosyanızı Yükleyin</h2>
+                <p>Ürün listesi ve rakip linklerini içeren Excel dosyanızı buraya sürükleyin</p>
+                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls">
+                <button type="button" class="btn" onclick="document.getElementById('fileInput').click()">
+                    <i class="fas fa-file-excel"></i>
+                    Dosya Seç
+                </button>
+                <div style="margin-top: 1rem;">
+                    <button type="button" class="btn btn-secondary" onclick="downloadSample()">
+                        <i class="fas fa-download"></i>
+                        Örnek Excel İndir
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Progress -->
+        <div class="progress-container" id="progressContainer">
+            <div class="loading-content">
+                <div class="loading-title">Fiyat Savaşı Başlıyor!</div>
+                <div class="loading-subtitle">Ürünleriniz rakiplerle karşılaştırılıyor...</div>
+                
+                <div class="versus-container">
+                    <div class="versus-side">
+                        <div class="versus-icon products">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <span>Ürünleriniz</span>
+                    </div>
+                    
+                    <div class="versus-vs">VS</div>
+                    <div class="battle-sparks">
+                        <div class="spark"></div>
+                        <div class="spark"></div>
+                        <div class="spark"></div>
+                        <div class="spark"></div>
+                        <div class="spark"></div>
+                        <div class="spark"></div>
+                    </div>
+                    
+                    <div class="versus-side">
+                        <div class="versus-icon competitors">
+                            <i class="fas fa-store"></i>
+                        </div>
+                        <span>Rakipler</span>
+                    </div>
+                </div>
+
+                <div class="circular-progress">
+                    <svg>
+                        <defs>
+                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#6366f1"/>
+                                <stop offset="100%" style="stop-color:#10b981"/>
+                            </linearGradient>
+                        </defs>
+                        <circle class="bg-circle" cx="60" cy="60" r="50"></circle>
+                        <circle class="progress-circle" cx="60" cy="60" r="50" id="progressCircle"></circle>
+                    </svg>
+                    <div class="progress-percentage" id="progressPercentage">0%</div>
+                </div>
+
+                <div class="current-product" id="currentProductInfo">
+                    <div class="current-product-name" id="currentProductName">Hazırlanıyor...</div>
+                    <div class="current-stats">
+                        <span id="currentProgress">0 / 0</span>
+                        <span id="currentTime">00:00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Section -->
+        <section class="comparison-section container" id="comparisonSection">
+            <div class="table-controls">
+                <div class="auto-refresh-controls">
+                    <button type="button" class="btn btn-refresh" id="manualRefreshBtn" title="Şimdi Güncelle">
+                        <i class="fas fa-sync-alt"></i>
+                        Güncelle
+                    </button>
+                    <label>Otomatik Güncelleme:</label>
+                    <select id="refreshInterval">
+                        <option value="0">Kapalı</option>
+                        <option value="300000">5 Dakika</option>
+                        <option value="600000">10 Dakika</option>
+                        <option value="1800000">30 Dakika</option>
+                        <option value="3600000" selected>1 Saat</option>
+                    </select>
+                    <button type="button" class="btn" id="startAutoRefresh">
+                        <i class="fas fa-play"></i>
+                        Başlat
+                    </button>
+                </div>
+                <div class="search-controls">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="productSearch" placeholder="Ürün ara..." />
+                        <button type="button" id="clearSearch" title="Temizle">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="search-results" id="searchResults">
+                        <span>Tüm ürünler gösteriliyor</span>
+                    </div>
+                </div>
+                <div class="live-indicator">
+                    <span id="lastUpdateTime">Son güncelleme: -</span>
+                </div>
+            </div>
+
+            <div class="comparison-table-container">
+                <div class="table-wrapper">
+                    <table class="comparison-table" id="comparisonTable">
+                        <thead>
+                            <tr id="tableHeader">
+                                <th>Ürün Adı</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Statistics -->
+        <section class="stats-section container" id="statsSection">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalProducts">0</div>
+                    <div class="stat-label">Toplam Ürün</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalCompanies">0</div>
+                    <div class="stat-label">Firma Sayısı</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="successRate">0%</div>
+                    <div class="stat-label">Başarı Oranı</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgUpdateTime">-</div>
+                    <div class="stat-label">Ort. Güncelleme</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let currentProducts = [];
+        let comparisonData = [];
+        let autoRefreshInterval = null;
+        let isProcessing = false;
+        let companies = [];
+
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const uploadSection = document.getElementById('uploadSection');
+        const comparisonSection = document.getElementById('comparisonSection');
+        const statsSection = document.getElementById('statsSection');
+        const progressContainer = document.getElementById('progressContainer');
+        const uploadNewExcelBtn = document.getElementById('uploadNewExcelBtn');
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        uploadNewExcelBtn.addEventListener('click', () => {
+            uploadSection.style.display = 'block';
+            comparisonSection.style.display = 'none';
+            statsSection.style.display = 'none';
+            uploadNewExcelBtn.style.display = 'none';
+            
+            // Stop auto refresh
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                document.getElementById('startAutoRefresh').innerHTML = '<i class="fas fa-play"></i> Başlat';
+            }
+        });
+
+        async function handleFileUpload(file) {
+            if (isProcessing) {
+                showNotification('Bir işlem zaten devam ediyor!', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('excelFile', file);
+
+            try {
+                isProcessing = true;
+                showNotification('Excel dosyası yükleniyor...', 'success');
+
+                const response = await fetch('/api/upload-excel', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentProducts = result.products;
+                    showNotification(`${result.products.length} ürün yüklendi!`, 'success');
+                    
+                    // Hide upload section and show comparison
+                    uploadSection.style.display = 'none';
+                    uploadNewExcelBtn.style.display = 'inline-flex';
+                    
+                    startComparison();
+                } else {
+                    showNotification(`Hata: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showNotification(`Yükleme hatası: ${error.message}`, 'error');
+            } finally {
+                isProcessing = false;
+            }
+        }
+
+        async function startComparison() {
+            if (currentProducts.length === 0) {
+                showNotification('Önce Excel dosyası yükleyin!', 'error');
+                return;
+            }
+
+            progressContainer.style.display = 'flex';
+            
+            const progressCircle = document.getElementById('progressCircle');
+            const progressPercentage = document.getElementById('progressPercentage');
+            const currentProductName = document.getElementById('currentProductName');
+            const currentProgress = document.getElementById('currentProgress');
+            const currentTime = document.getElementById('currentTime');
+            
+            let startTime = Date.now();
+
+            try {
+                const params = new URLSearchParams({
+                    products: JSON.stringify(currentProducts)
+                });
+                
+                const eventSource = new EventSource(`/api/batch-compare?${params}`);
+                
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60);
+                    const seconds = elapsed % 60;
+                    currentTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    switch(data.type) {
+                        case 'start':
+                            currentProductName.textContent = 'Savaş başlıyor...';
+                            currentProgress.textContent = `0 / ${data.total}`;
+                            break;
+                            
+                        case 'progress':
+                            const percent = Math.round((data.current / data.total) * 100);
+                            const circumference = 314.16; // 2 * Math.PI * 50
+                            const offset = circumference - (percent / 100) * circumference;
+                            progressCircle.style.strokeDashoffset = offset;
+                            progressPercentage.textContent = `${percent}%`;
+                            currentProductName.textContent = data.productName;
+                            currentProgress.textContent = `${data.current} / ${data.total}`;
+                            break;
+                            
+                        case 'complete':
+                            eventSource.close();
+                            progressContainer.style.display = 'none';
+                            comparisonData = data.results;
+                            buildComparisonTable();
+                            comparisonSection.style.display = 'block';
+                            statsSection.style.display = 'block';
+                            updateStats(data.totalProcessed, data.successCount, data.errorCount);
+                            updateLastUpdateTime();
+                            showNotification('Karşılaştırma tamamlandı!', 'success');
+                            break;
+                            
+                        case 'error':
+                            eventSource.close();
+                            progressContainer.style.display = 'none';
+                            showNotification(`Hata: ${data.error}`, 'error');
+                            break;
+                    }
+                };
+                
+                eventSource.onerror = function(error) {
+                    eventSource.close();
+                    progressContainer.style.display = 'none';
+                    showNotification('Bağlantı hatası oluştu', 'error');
+                };
+                
+            } catch (error) {
+                progressContainer.style.display = 'none';
+                showNotification(`Karşılaştırma hatası: ${error.message}`, 'error');
+            }
+        }
+
+        function buildComparisonTable() {
+            if (!comparisonData || comparisonData.length === 0) return;
+
+            // Extract all unique companies
+            companies = [];
+            const companySet = new Set();
+            
+            comparisonData.forEach(result => {
+                if (result.success && result.comparison && result.comparison.ranking) {
+                    result.comparison.ranking.forEach(item => {
+                        const domain = getDomainName(item.url);
+                        companySet.add(domain);
+                    });
+                }
+            });
+            
+            companies = Array.from(companySet).sort();
+
+            // Build table header
+            const tableHeader = document.getElementById('tableHeader');
+            tableHeader.innerHTML = '<th>Ürün Adı</th>';
+            
+            companies.forEach(company => {
+                const th = document.createElement('th');
+                th.className = 'company-header';
+                th.textContent = company;
+                tableHeader.appendChild(th);
+            });
+
+            // Build table body
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+
+            comparisonData.forEach(result => {
+                const row = document.createElement('tr');
+                
+                // Product name cell
+                const productCell = document.createElement('td');
+                productCell.textContent = result.productName;
+                row.appendChild(productCell);
+
+                // Create price map for this product
+                const priceMap = new Map();
+                let minPrice = Infinity;
+                let maxPrice = -Infinity;
+                
+                if (result.success && result.comparison && result.comparison.ranking) {
+                    result.comparison.ranking.forEach(item => {
+                        if (item.price && item.price > 0) {
+                            const domain = getDomainName(item.url);
+                            priceMap.set(domain, {
+                                price: item.price,
+                                url: item.url,
+                                title: item.title,
+                                error: item.error,
+                                notFound: item.notFound
+                            });
+                            minPrice = Math.min(minPrice, item.price);
+                            maxPrice = Math.max(maxPrice, item.price);
+                        }
+                    });
+                }
+
+                // Create cells for each company
+                companies.forEach(company => {
+                    const cell = document.createElement('td');
+                    const priceData = priceMap.get(company);
+                    
+                    if (priceData && priceData.price) {
+                        const priceCell = document.createElement('div');
+                        priceCell.className = 'price-cell';
+                        
+                        // Determine if this is best or worst price
+                        if (priceData.price === minPrice && minPrice !== maxPrice) {
+                            priceCell.classList.add('best-price');
+                        } else if (priceData.price === maxPrice && minPrice !== maxPrice) {
+                            priceCell.classList.add('worst-price');
+                        }
+                        
+                        priceCell.innerHTML = `
+                            <div>${priceData.price.toLocaleString('tr-TR')} ₺</div>
+                            <div class="last-updated">${new Date().toLocaleTimeString('tr-TR')}</div>
+                        `;
+                        
+                        cell.appendChild(priceCell);
+                    } else {
+                        const priceCell = document.createElement('div');
+                        priceCell.className = 'price-cell no-price';
+                        priceCell.textContent = 'Fiyat Yok';
+                        cell.appendChild(priceCell);
+                    }
+                    
+                    row.appendChild(cell);
+                });
+
+                row.className = 'product-row';
+                tableBody.appendChild(row);
+            });
+            
+            // Update search functionality with new rows
+            allProductRows = Array.from(document.querySelectorAll('#tableBody tr'));
+            
+            // Re-apply current search if exists
+            const currentSearch = productSearch.value.toLowerCase().trim();
+            if (currentSearch) {
+                filterProducts(currentSearch);
+            }
+        }
+
+        async function refreshPrices() {
+            if (isProcessing || !currentProducts.length) return;
+
+            isProcessing = true;
+            
+            // Mark all price cells as updating
+            document.querySelectorAll('.price-cell').forEach(cell => {
+                if (!cell.classList.contains('no-price')) {
+                    cell.classList.add('updating');
+                }
+            });
+
+            try {
+                const params = new URLSearchParams({
+                    products: JSON.stringify(currentProducts)
+                });
+                
+                const eventSource = new EventSource(`/api/batch-compare?${params}`);
+                
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'complete') {
+                        eventSource.close();
+                        comparisonData = data.results;
+                        buildComparisonTable();
+                        updateStats(data.totalProcessed, data.successCount, data.errorCount);
+                        updateLastUpdateTime();
+                        
+                        // Remove updating class
+                        document.querySelectorAll('.price-cell').forEach(cell => {
+                            cell.classList.remove('updating');
+                        });
+                        
+                        isProcessing = false;
+                        showNotification(`Fiyatlar güncellendi! ${data.successCount}/${data.totalProcessed} başarılı`, 'success');
+                    }
+                };
+                
+                eventSource.onerror = function(error) {
+                    eventSource.close();
+                    isProcessing = false;
+                    document.querySelectorAll('.price-cell').forEach(cell => {
+                        cell.classList.remove('updating');
+                    });
+                    showNotification('Güncelleme hatası!', 'error');
+                };
+                
+            } catch (error) {
+                isProcessing = false;
+                document.querySelectorAll('.price-cell').forEach(cell => {
+                    cell.classList.remove('updating');
+                });
+                showNotification(`Güncelleme hatası: ${error.message}`, 'error');
+            }
+        }
+
+        function getDomainName(url) {
+            try {
+                return new URL(url).hostname.replace('www.', '');
+            } catch {
+                return url;
+            }
+        }
+
+        function updateStats(total, successful, failed) {
+            document.getElementById('totalProducts').textContent = total;
+            document.getElementById('totalCompanies').textContent = companies.length;
+            document.getElementById('successRate').textContent = 
+                total > 0 ? Math.round((successful / total) * 100) + '%' : '0%';
+        }
+
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('tr-TR');
+            document.getElementById('lastUpdateTime').textContent = `Son güncelleme: ${timeString}`;
+        }
+
+        // Auto refresh functionality
+        const refreshIntervalSelect = document.getElementById('refreshInterval');
+        const startAutoRefreshBtn = document.getElementById('startAutoRefresh');
+        const manualRefreshBtn = document.getElementById('manualRefreshBtn');
+
+        // Search functionality
+        const productSearch = document.getElementById('productSearch');
+        const clearSearch = document.getElementById('clearSearch');
+        const searchResults = document.getElementById('searchResults');
+        let allProductRows = [];
+
+        productSearch.addEventListener('input', handleSearch);
+        clearSearch.addEventListener('click', clearSearchInput);
+
+        function handleSearch() {
+            const searchTerm = productSearch.value.toLowerCase().trim();
+            const searchBox = productSearch.parentElement;
+            
+            // Toggle clear button visibility
+            if (searchTerm) {
+                searchBox.classList.add('has-text');
+            } else {
+                searchBox.classList.remove('has-text');
+            }
+            
+            filterProducts(searchTerm);
+        }
+
+        function filterProducts(searchTerm) {
+            if (!allProductRows.length) {
+                allProductRows = Array.from(document.querySelectorAll('#tableBody tr'));
+            }
+            
+            let visibleCount = 0;
+            let highlightedCount = 0;
+            
+            allProductRows.forEach(row => {
+                const productName = row.querySelector('td:first-child').textContent.toLowerCase();
+                const isMatch = !searchTerm || productName.includes(searchTerm);
+                
+                if (isMatch) {
+                    row.classList.remove('hidden');
+                    visibleCount++;
+                    
+                    // Highlight exact matches
+                    if (searchTerm && productName.includes(searchTerm)) {
+                        row.classList.add('highlighted');
+                        highlightedCount++;
+                    } else {
+                        row.classList.remove('highlighted');
+                    }
+                } else {
+                    row.classList.add('hidden');
+                    row.classList.remove('highlighted');
+                }
+            });
+            
+            updateSearchResults(searchTerm, visibleCount, highlightedCount);
+        }
+
+        function updateSearchResults(searchTerm, visibleCount, highlightedCount) {
+            const totalProducts = allProductRows.length;
+            
+            if (!searchTerm) {
+                searchResults.textContent = `Tüm ürünler gösteriliyor (${totalProducts})`;
+                searchResults.classList.remove('filtered');
+            } else {
+                if (visibleCount === 0) {
+                    searchResults.textContent = `"${searchTerm}" için sonuç bulunamadı`;
+                    searchResults.classList.add('filtered');
+                } else if (visibleCount === totalProducts) {
+                    searchResults.textContent = `Tüm ürünler "${searchTerm}" ile eşleşiyor (${totalProducts})`;
+                    searchResults.classList.add('filtered');
+                } else {
+                    searchResults.textContent = `${visibleCount} ürün "${searchTerm}" ile eşleşiyor`;
+                    searchResults.classList.add('filtered');
+                }
+            }
+        }
+
+        function clearSearchInput() {
+            productSearch.value = '';
+            productSearch.parentElement.classList.remove('has-text');
+            filterProducts('');
+            productSearch.focus();
+        }
+
+        startAutoRefreshBtn.addEventListener('click', toggleAutoRefresh);
+        manualRefreshBtn.addEventListener('click', manualRefresh);
+
+        async function manualRefresh() {
+            if (isProcessing || !currentProducts.length) {
+                if (!currentProducts.length) {
+                    showNotification('Önce Excel dosyası yükleyin!', 'error');
+                }
+                return;
+            }
+
+            // Button loading state
+            manualRefreshBtn.disabled = true;
+            manualRefreshBtn.classList.add('loading');
+            manualRefreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Güncelleniyor...';
+
+            try {
+                await refreshPrices();
+            } finally {
+                // Reset button state
+                manualRefreshBtn.disabled = false;
+                manualRefreshBtn.classList.remove('loading');
+                manualRefreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Güncelle';
+            }
+        }
+
+        function toggleAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                startAutoRefreshBtn.innerHTML = '<i class="fas fa-play"></i> Başlat';
+                showNotification('Otomatik güncelleme durduruldu', 'success');
+            } else {
+                startAutoRefresh();
+            }
+        }
+
+        function startAutoRefresh() {
+            const interval = parseInt(refreshIntervalSelect.value);
+            if (interval === 0 || currentProducts.length === 0) {
+                showNotification('Güncelleme sıklığı seçin!', 'error');
+                return;
+            }
+
+            autoRefreshInterval = setInterval(() => {
+                refreshPrices();
+            }, interval);
+
+            startAutoRefreshBtn.innerHTML = '<i class="fas fa-stop"></i> Durdur';
+            showNotification(`Otomatik güncelleme ${interval/60000} dakikada bir çalışacak`, 'success');
+        }
+
+        async function downloadSample() {
+            try {
+                const response = await fetch('/api/sample-excel');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ornek_urunler.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                showNotification('Örnek dosya indirildi!', 'success');
+            } catch (error) {
+                showNotification('Dosya indirme hatası!', 'error');
+            }
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 4000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            showNotification('3Dcim PriceTracker Pro\'ya hoş geldiniz!', 'success');
+        });
+    </script>
+</body>
+</html>
