@@ -941,6 +941,7 @@ class PriceScraper {
         // Fallback to general search
         if (!price) {
           console.log('🔍 Genel fiyat arama başlatılıyor...');
+          if (isBambuLab) console.log('🎯 BAMBU LAB - Genel arama başlatılıyor...');
           
           const generalSelectors = [
             '.price', '.product-price', '.current-price', '.sale-price',
@@ -953,6 +954,9 @@ class PriceScraper {
           
           for (const selector of generalSelectors) {
             const element = document.querySelector(selector);
+            if (isBambuLab && element) {
+              console.log(`🎯 BAMBU LAB - Genel selector "${selector}" bulundu: "${element.textContent.trim()}"`);
+            }
             if (element) {
               price = extractPrice(element.textContent);
               if (price) {
