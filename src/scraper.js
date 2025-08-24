@@ -47,7 +47,17 @@ class PriceScraper {
           '.price-list .money',
           '.variant-price .money',
           'meta[property="product:price:amount"]',
-          'script[type="application/ld+json"]'
+          'script[type="application/ld+json"]',
+          // Bambu Lab için ek selector'lar
+          '.product-form .price .money',
+          '.product-form__buttons .price .money',
+          '.product__info .price .money',
+          '.product-single__price .money',
+          '.shopify-payment-button .price .money',
+          '.product-form__item .money',
+          '.product__price-and-badge .money',
+          '.price-container .money',
+          '.product-price-container .money'
         ]
       },
       'store.metatechtr.com': {
@@ -238,6 +248,12 @@ class PriceScraper {
     try {
       console.log(`\n🌐 HTTP scraping başlatılıyor: ${url}`);
       
+      // Bambu Lab ürünü kontrolü
+      const isBambuLab = url.toLowerCase().includes('bambu-lab') || url.toLowerCase().includes('bambulab');
+      if (isBambuLab) {
+        console.log('🎯 BAMBU LAB ÜRÜNÜ TESPİT EDİLDİ - Özel debug modu aktif');
+      }
+      
       const response = await Promise.race([
         axios.get(url, {
           headers: {
@@ -292,6 +308,43 @@ class PriceScraper {
       let price = null;
       let extractionMethod = 'unknown';
       
+      // Bambu Lab için özel debug
+      if (isBambuLab) {
+        console.log('🔍 BAMBU LAB DEBUG - Sayfa içeriği analiz ediliyor...');
+        
+        // Tüm .money class'larını bul
+        const moneyElements = $('.money');
+        console.log(`💰 Toplam ${moneyElements.length} adet .money elementi bulundu:`);
+        moneyElements.each((index, element) => {
+          const $elem = $(element);
+          const text = $elem.text().trim();
+          const parent = $elem.parent().attr('class') || 'no-class';
+          console.log(`  ${index + 1}. .money: "${text}" - Parent: ${parent}`);
+        });
+        
+        // Tüm price içeren class'ları bul
+        const priceElements = $('[class*="price"]');
+        console.log(`💲 Toplam ${priceElements.length} adet price içeren element bulundu:`);
+        priceElements.slice(0, 10).each((index, element) => {
+          const $elem = $(element);
+          const className = $elem.attr('class') || 'no-class';
+          const text = $elem.text().trim().substring(0, 50);
+          console.log(`  ${index + 1}. price element: ${className} - "${text}"`);
+        });
+        
+        // Script tag'leri kontrol et
+        const scripts = $('script');
+        console.log(`📜 Toplam ${scripts.length} adet script bulundu`);
+        scripts.each((index, element) => {
+          const $elem = $(element);
+          const content = $elem.html();
+          if (content && (content.includes('price') || content.includes('Price') || content.includes('amount'))) {
+            console.log(`  Script ${index + 1} fiyat bilgisi içeriyor (ilk 100 karakter):`);
+            console.log(`  "${content.substring(0, 100)}..."`);
+          }
+        });
+      }
+      
       if (siteConfig) {
         console.log(`🎯 Site-specific config bulundu: ${hostname}`);
         
@@ -303,6 +356,7 @@ class PriceScraper {
             if (element.length) {
               const attrValue = element.attr(attr);
               if (attrValue) {
+                if (isBambuLab) console.log(`🎯 BAMBU LAB - Data attr ${attr}: "${attrValue}"`);
                 price = this.extractPrice(attrValue);
                 if (price) {
                   extractionMethod = `data-attribute: ${attr}`;
@@ -321,6 +375,7 @@ class PriceScraper {
             const element = $(selector).first();
             if (element.length) {
               const text = element.text().trim();
+              if (isBambuLab) console.log(`🎯 BAMBU LAB - Primary selector ${selector}: "${text}"`);
               price = this.extractPrice(text);
               if (price) {
                 extractionMethod = `primary-selector: ${selector}`;
@@ -377,6 +432,7 @@ class PriceScraper {
               if (metaElement.length) {
                 const content = metaElement.attr('content');
                 if (content) {
+                  if (isBambuLab) console.log(`🎯 BAMBU LAB - Meta tag ${selector}: "${content}"`);
                   price = this.extractPrice(content);
                   if (price) {
                     extractionMethod = `meta-tag: ${selector}`;
@@ -388,9 +444,11 @@ class PriceScraper {
             } else if (selector.includes('script')) {
               // JSON-LD script kontrolü
               const scriptElements = $('script[type="application/ld+json"]');
+              if (isBambuLab) console.log(`🎯 BAMBU LAB - ${scriptElements.length} adet JSON-LD script bulundu`);
               scriptElements.each((index, element) => {
                 try {
                   const jsonData = JSON.parse($(element).html());
+                  if (isBambuLab) console.log(`🎯 BAMBU LAB - JSON-LD ${index + 1}:`, JSON.stringify(jsonData, null, 2).substring(0, 200));
                   if (jsonData.offers && jsonData.offers.price) {
                     price = this.extractPrice(jsonData.offers.price.toString());
                     if (price) {
@@ -411,7 +469,7 @@ class PriceScraper {
                     }
                   }
                 } catch (jsonError) {
-                  console.log('JSON-LD parse hatası:', jsonError.message);
+                  if (isBambuLab) console.log('🎯 BAMBU LAB - JSON-LD parse hatası:', jsonError.message);
                 }
               });
               if (price) break;
@@ -420,6 +478,7 @@ class PriceScraper {
               const element = $(selector).first();
               if (element.length) {
                 const text = element.text().trim();
+                if (isBambuLab) console.log(`🎯 BAMBU LAB - Special selector ${selector}: "${text}"`);
                 price = this.extractPrice(text);
                 if (price) {
                   extractionMethod = `special-selector: ${selector}`;
@@ -435,6 +494,7 @@ class PriceScraper {
       // 6. Fallback to general smart price finding
       if (!price) {
         console.log('🔍 Genel akıllı fiyat arama başlatılıyor...');
+        if (isBambuLab) console.log('🎯 BAMBU LAB - Akıllı fiyat arama başlatılıyor...');
         price = this.findSmartPrice($);
         if (price) {
           extractionMethod = 'smart-price-finder';
@@ -448,6 +508,10 @@ class PriceScraper {
       const duration = Date.now() - startTime;
       console.log(`⏱️ HTTP scraping tamamlandı (${duration}ms) - Fiyat: ${price || 'bulunamadı'} - Method: ${extractionMethod}`);
       
+      if (isBambuLab && !price) {
+        console.log('❌ BAMBU LAB ÜRÜNÜ İÇİN FİYAT BULUNAMADI - Puppeteer deneyecek');
+      }
+      
       return {
         url,
         title: title.trim(),
@@ -456,7 +520,8 @@ class PriceScraper {
         success: !!price,
         method: 'HTTP',
         extractionMethod,
-        duration
+        duration,
+        isBambuLab
       };
       
     } catch (error) {
