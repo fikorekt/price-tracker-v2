@@ -39,16 +39,14 @@ class PriceScraper {
           '.price-item--last'
         ],
         hiddenInputs: [],
-        // Bambu Lab ürünleri için özel selector'lar
-        specialSelectors: [
+        // Bambu Lab ürünleri için çok kapsamlı selector'lar
+        bambuLabSelectors: [
+          // Shopify standard selectors
           '.product-form__cart .price .money',
           '.product__price .money',
           '.product-price-wrap .money',
           '.price-list .money',
           '.variant-price .money',
-          'meta[property="product:price:amount"]',
-          'script[type="application/ld+json"]',
-          // Bambu Lab için ek selector'lar
           '.product-form .price .money',
           '.product-form__buttons .price .money',
           '.product__info .price .money',
@@ -57,7 +55,42 @@ class PriceScraper {
           '.product-form__item .money',
           '.product__price-and-badge .money',
           '.price-container .money',
-          '.product-price-container .money'
+          '.product-price-container .money',
+          // Daha agresif selector'lar
+          'span.money',
+          'div.money',
+          'p.money',
+          '[class*="money"]',
+          '[class*="price"]',
+          '[data-price]',
+          '[data-product-price]',
+          '[data-variant-price]',
+          // ID bazlı selector'lar
+          '#product-price',
+          '#variant-price',
+          '#price-preview',
+          // Shopify tema selector'ları
+          '.product__price-and-badge span',
+          '.product-form__cart span',
+          '.product__info-container span',
+          '.product-single__meta span',
+          '.product__content span',
+          // Genel span taraması
+          'span:contains("₺")',
+          'span:contains("TL")',
+          'div:contains("₺")',
+          'div:contains("TL")'
+        ],
+        specialSelectors: [
+          '.product-form__cart .price .money',
+          '.product__price .money',
+          '.product-price-wrap .money',
+          '.price-list .money',
+          '.variant-price .money',
+          'meta[property="product:price:amount"]',
+          'script[type="application/ld+json"]',
+          'script:contains("price")',
+          'script:contains("variant")'
         ]
       },
       'store.metatechtr.com': {
