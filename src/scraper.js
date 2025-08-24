@@ -518,7 +518,7 @@ class PriceScraper {
       '.price-item--regular', '.price-item--last', '.price-item--regular .money', '.price-item--last .money',
       '.price-item--sale', '.price__sale', '.price__container',
       'span[data-product-price]', '[data-product-price]',
-      '.price-item--sale .money', '.price-item .money'
+      '.price-item--sale .money', '.price-item .money',
       '.price-item--regular', '.price-item--last',
       // Bambu Lab ve özel ürünler için
       '.product-form__cart .price .money',
