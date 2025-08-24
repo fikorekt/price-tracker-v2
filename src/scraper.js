@@ -902,6 +902,97 @@ class PriceScraper {
         if (siteSelectors) {
           console.log('🎯 Site-specific selectors kullanılıyor');
           
+          // Bambu Lab için özel selector'lar
+          if (window.location.href.toLowerCase().includes('bambu-lab') || window.location.href.toLowerCase().includes('bambulab')) {
+            console.log('🎯 BAMBU LAB - Puppeteer özel selector'lar deneniyor...');
+            
+            if (siteSelectors.bambuLabSelectors) {
+              for (const selector of siteSelectors.bambuLabSelectors) {
+                try {
+                  if (selector.includes(':contains(')) {
+                    // :contains selector'ını manuel işle
+                    const currency = selector.includes('₺') ? '₺' : 'TL';
+                    const elements = document.querySelectorAll('span, div, p');
+                    
+                    for (let element of elements) {
+                      const text = element.textContent.trim();
+                      if (text.includes(currency) && text.length < 50) {
+                        const extractedPrice = extractPrice(text);
+                        if (extractedPrice) {
+                          price = extractedPrice;
+                          extractionMethod = `bambu-puppeteer-contains: ${selector}`;
+                          console.log(`✅ BAMBU LAB Puppeteer - Contains ile fiyat bulundu: ${price} (${text})`);
+                          break;
+                        }
+                      }
+                    }
+                    if (price) break;
+                  } else {
+                    const elements = document.querySelectorAll(selector);
+                    console.log(`🔍 BAMBU LAB Puppeteer - "${selector}": ${elements.length} element`);
+                    
+                    for (let element of elements) {
+                      const text = element.textContent.trim();
+                      const dataPrice = element.getAttribute('data-price') || 
+                                      element.getAttribute('data-product-price') || 
+                                      element.getAttribute('data-variant-price');
+                      
+                      console.log(`  Element: "${text}" ${dataPrice ? `(data: ${dataPrice})` : ''}`);
+                      
+                      if (dataPrice) {
+                        const extractedPrice = extractPrice(dataPrice);
+                        if (extractedPrice) {
+                          price = extractedPrice;
+                          extractionMethod = `bambu-puppeteer-data: ${selector}`;
+                          console.log(`✅ BAMBU LAB Puppeteer - Data ile fiyat bulundu: ${price}`);
+                          break;
+                        }
+                      }
+                      
+                      if (text) {
+                        const extractedPrice = extractPrice(text);
+                        if (extractedPrice) {
+                          price = extractedPrice;
+                          extractionMethod = `bambu-puppeteer-text: ${selector}`;
+                          console.log(`✅ BAMBU LAB Puppeteer - Text ile fiyat bulundu: ${price} (${text})`);
+                          break;
+                        }
+                      }
+                    }
+                    if (price) break;
+                  }
+                } catch (selectorError) {
+                  console.log(`❌ BAMBU LAB Puppeteer - Selector hatası "${selector}":`, selectorError.message);
+                }
+              }
+            }
+            
+            // Eğer hala fiyat bulunamadıysa, agresif tarama yap
+            if (!price) {
+              console.log('🎯 BAMBU LAB Puppeteer - Agresif tarama başlatılıyor...');
+              
+              const allElements = document.querySelectorAll('*');
+              for (let element of allElements) {
+                const text = element.textContent;
+                if (text && (text.includes('₺') || text.includes('TL')) && text.length < 100) {
+                  const extractedPrice = extractPrice(text);
+                  if (extractedPrice && extractedPrice > 100 && extractedPrice < 100000) {
+                    console.log(`🎯 BAMBU LAB Puppeteer - Agresif taramada bulundu: "${text}" -> ${extractedPrice}`);
+                    price = extractedPrice;
+                    extractionMethod = 'bambu-puppeteer-aggressive';
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (price) {
+              console.log(`✅ BAMBU LAB Puppeteer - Fiyat bulundu: ${price} TL`);
+            } else {
+              console.log('❌ BAMBU LAB Puppeteer - Hiç fiyat bulunamadı');
+            }
+          }
+          
           // Try data attributes first
           if (siteSelectors.dataAttributes && siteSelectors.dataAttributes.length > 0) {
             console.log('📊 Data attribute\'lar kontrol ediliyor...');
