@@ -18,8 +18,8 @@ class PriceScraper {
         dataAttributes: []
       },
       'porima3d.com': {
-        primary: ['.price-item--sale .money', '.price__sale .money'],
-        alternative: ['.price__container .money', '.money'],
+        primary: ['.price-item--sale .money', '.price__sale .money', '.price-item .money'],
+        alternative: ['.price__container .money', '.money', '.price .money', '[data-price] .money'],
         hiddenInputs: [],
         dataAttributes: []
       },
@@ -27,7 +27,7 @@ class PriceScraper {
         primary: ['.product-price', '.product-current-price .product-price'],
         alternative: ['.product-price-not-vat'],
         hiddenInputs: [],
-        dataAttributes: ['data-price', 'data-default-price']
+        dataAttributes: [] // data-price değeri yanlış, sadece text'i kullan
       },
       '3dteknomarket.com': {
         primary: ['#indirimliFiyat .spanFiyat', '.IndirimliFiyatContent .spanFiyat'],
@@ -128,6 +128,19 @@ class PriceScraper {
     
     // Remove currency symbols and "TL" text
     cleanText = cleanText.replace(/[₺$€]/g, '').replace(/TL/gi, '').trim();
+    
+    // store.metatechtr.com için özel kontrol - eğer çok büyük sayı varsa (data-default-price) atla
+    if (cleanText.includes('.') && cleanText.split('.').length > 3) {
+      console.log(`❌ Çok fazla nokta içeren sayı atlandı: "${cleanText}"`);
+      return null;
+    }
+    
+    // Eğer sayı 100000'den büyükse ve virgül yoksa muhtemelen yanlış format
+    const tempNum = parseFloat(cleanText.replace(/\./g, ''));
+    if (tempNum > 100000 && !cleanText.includes(',')) {
+      console.log(`❌ Çok büyük sayı (muhtemelen yanlış format): "${cleanText}"`);
+      return null;
+    }
     
     // Turkish price format patterns
     const patterns = [
@@ -410,7 +423,8 @@ class PriceScraper {
       '.fiyat', '.tutar', '.amount', '.cost', '.value',
       '[data-price]', '.money', '.currency',
       '.product-amount', '.final-price', '.selling-price',
-      '.price-current', '.price-item', '.price-wrapper'
+      '.price-current', '.price-item', '.price-wrapper',
+      '.price-item--regular', '.price-item--last'
     ];
 
     // Try general selectors first
@@ -684,8 +698,8 @@ class PriceScraper {
         if (siteSelectors) {
           console.log('🎯 Site-specific selectors kullanılıyor');
           
-          // Try data attributes first
-          if (siteSelectors.dataAttributes) {
+          // Try data attributes first (sadece store.metatechtr.com için devre dışı)
+          if (siteSelectors.dataAttributes && siteSelectors.dataAttributes.length > 0) {
             for (const attr of siteSelectors.dataAttributes) {
               const element = document.querySelector(`[${attr}]`);
               if (element) {
@@ -757,8 +771,8 @@ class PriceScraper {
           
           const generalSelectors = [
             '.price', '.product-price', '.current-price', '.sale-price',
-            '.fiyat', '.tutar', '.amount', '.cost', '.value',
-            '[data-price]', '.money', '.currency'
+            '.fiyat', '.tutar', '.amount', '.cost', '.value', '.money', '.currency',
+            '.price-item--regular', '.price-item--last', '.price-item'
           ];
           
           for (const selector of generalSelectors) {
