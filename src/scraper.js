@@ -18,10 +18,26 @@ class PriceScraper {
         dataAttributes: []
       },
       'porima3d.com': {
-        primary: ['.price-item--sale .money', '.price__sale .money', '.price-item .money'],
-        alternative: ['.price__container .money', '.money', '.price .money', '[data-price] .money'],
+        primary: [
+          '.price-item--sale .money', 
+          '.price__sale .money', 
+          '.price-item .money',
+          '.price .money',
+          '.money'
+        ],
+        alternative: [
+          '.price__container .money', 
+          '[data-price] .money', 
+          '.price-item--regular', 
+          '.price-item--last',
+          '.price-wrapper .money',
+          '.product-price .money',
+          'span[data-product-price]',
+          '.price-current',
+          '.current-price'
+        ],
         hiddenInputs: [],
-        dataAttributes: []
+        dataAttributes: ['data-product-price', 'data-price']
       },
       'store.metatechtr.com': {
         primary: ['.product-price', '.product-current-price .product-price'],
@@ -424,7 +440,9 @@ class PriceScraper {
       '[data-price]', '.money', '.currency',
       '.product-amount', '.final-price', '.selling-price',
       '.price-current', '.price-item', '.price-wrapper',
-      '.price-item--regular', '.price-item--last'
+      '.price-item--regular', '.price-item--last',
+      '.price-item--sale', '.price__sale', '.price__container',
+      'span[data-product-price]', '[data-product-price]'
     ];
 
     // Try general selectors first
@@ -698,17 +716,19 @@ class PriceScraper {
         if (siteSelectors) {
           console.log('🎯 Site-specific selectors kullanılıyor');
           
-          // Try data attributes first (sadece store.metatechtr.com için devre dışı)
+          // Try data attributes first
           if (siteSelectors.dataAttributes && siteSelectors.dataAttributes.length > 0) {
+            console.log('📊 Data attribute\'lar kontrol ediliyor...');
             for (const attr of siteSelectors.dataAttributes) {
               const element = document.querySelector(`[${attr}]`);
               if (element) {
                 const attrValue = element.getAttribute(attr);
                 if (attrValue) {
+                  console.log(`🔍 Data attribute bulundu: ${attr} = ${attrValue}`);
                   price = extractPrice(attrValue);
                   if (price) {
                     extractionMethod = `data-attribute: ${attr}`;
-                    console.log(`✅ Data attribute ile fiyat bulundu: ${price}`);
+                    console.log(`✅ Data attribute ile fiyat bulundu: ${price} (${attr})`);
                     break;
                   }
                 }
@@ -772,7 +792,9 @@ class PriceScraper {
           const generalSelectors = [
             '.price', '.product-price', '.current-price', '.sale-price',
             '.fiyat', '.tutar', '.amount', '.cost', '.value', '.money', '.currency',
-            '.price-item--regular', '.price-item--last', '.price-item'
+            '.price-item--regular', '.price-item--last', '.price-item',
+            '.price-item--sale', '.price__sale', '.price__container',
+            'span[data-product-price]', '[data-product-price]'
           ];
           
           for (const selector of generalSelectors) {
