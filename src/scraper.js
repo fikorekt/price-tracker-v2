@@ -38,7 +38,17 @@ class PriceScraper {
           '.price-item--sale',
           '.price-item--last'
         ],
-        hiddenInputs: []
+        hiddenInputs: [],
+        // Bambu Lab ürünleri için özel selector'lar
+        specialSelectors: [
+          '.product-form__cart .price .money',
+          '.product__price .money',
+          '.product-price-wrap .money',
+          '.price-list .money',
+          '.variant-price .money',
+          'meta[property="product:price:amount"]',
+          'script[type="application/ld+json"]'
+        ]
       },
       'store.metatechtr.com': {
         primary: ['.product-price', '.product-current-price .product-price'],
@@ -356,9 +366,73 @@ class PriceScraper {
             }
           }
         }
+        
+        // 5. Try special selectors (for specific products like Bambu Lab)
+        if (!price && siteConfig.specialSelectors) {
+          console.log('🎯 Special selector\'lar kontrol ediliyor (Bambu Lab vs.)...');
+          for (const selector of siteConfig.specialSelectors) {
+            if (selector.startsWith('meta[')) {
+              // Meta tag kontrolü
+              const metaElement = $(selector).first();
+              if (metaElement.length) {
+                const content = metaElement.attr('content');
+                if (content) {
+                  price = this.extractPrice(content);
+                  if (price) {
+                    extractionMethod = `meta-tag: ${selector}`;
+                    console.log(`✅ Meta tag ile fiyat bulundu: ${price} (${selector})`);
+                    break;
+                  }
+                }
+              }
+            } else if (selector.includes('script')) {
+              // JSON-LD script kontrolü
+              const scriptElements = $('script[type="application/ld+json"]');
+              scriptElements.each((index, element) => {
+                try {
+                  const jsonData = JSON.parse($(element).html());
+                  if (jsonData.offers && jsonData.offers.price) {
+                    price = this.extractPrice(jsonData.offers.price.toString());
+                    if (price) {
+                      extractionMethod = 'json-ld-script';
+                      console.log(`✅ JSON-LD script ile fiyat bulundu: ${price}`);
+                      return false; // Break out of each loop
+                    }
+                  }
+                  if (jsonData['@type'] === 'Product' && jsonData.offers) {
+                    const offers = Array.isArray(jsonData.offers) ? jsonData.offers[0] : jsonData.offers;
+                    if (offers.price) {
+                      price = this.extractPrice(offers.price.toString());
+                      if (price) {
+                        extractionMethod = 'json-ld-product';
+                        console.log(`✅ JSON-LD Product ile fiyat bulundu: ${price}`);
+                        return false;
+                      }
+                    }
+                  }
+                } catch (jsonError) {
+                  console.log('JSON-LD parse hatası:', jsonError.message);
+                }
+              });
+              if (price) break;
+            } else {
+              // Normal selector
+              const element = $(selector).first();
+              if (element.length) {
+                const text = element.text().trim();
+                price = this.extractPrice(text);
+                if (price) {
+                  extractionMethod = `special-selector: ${selector}`;
+                  console.log(`✅ Special selector ile fiyat bulundu: ${price} (${selector})`);
+                  break;
+                }
+              }
+            }
+          }
+        }
       }
       
-      // 5. Fallback to general smart price finding
+      // 6. Fallback to general smart price finding
       if (!price) {
         console.log('🔍 Genel akıllı fiyat arama başlatılıyor...');
         price = this.findSmartPrice($);
@@ -445,7 +519,13 @@ class PriceScraper {
       '.price-item--sale', '.price__sale', '.price__container',
       'span[data-product-price]', '[data-product-price]',
       '.price-item--sale .money', '.price-item .money'
-    ];
+      '.price-item--regular', '.price-item--last',
+      // Bambu Lab ve özel ürünler için
+      '.product-form__cart .price .money',
+      '.product__price .money',
+      '.product-price-wrap .money',
+      '.price-list .money',
+      '.variant-price .money'
 
     // Try general selectors first
     generalSelectors.forEach(selector => {
