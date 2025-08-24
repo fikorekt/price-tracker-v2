@@ -8,6 +8,53 @@ class PriceScraper {
     this.browserPool = [];
     this.maxBrowsers = 3;
     this.isClosing = false;
+    
+    // Site-specific selectors based on analysis
+    this.siteSpecificSelectors = {
+      '3dcim.com': {
+        primary: ['#indirimliFiyat .spanFiyat', '.indirimliFiyat .spanFiyat'],
+        alternative: ['.IndirimliFiyatContent .spanFiyat', '.spanFiyat'],
+        hiddenInputs: [],
+        dataAttributes: []
+      },
+      'porima3d.com': {
+        primary: ['.price-item--sale .money', '.price__sale .money'],
+        alternative: ['.price__container .money', '.money'],
+        hiddenInputs: [],
+        dataAttributes: []
+      },
+      'store.metatechtr.com': {
+        primary: ['.product-price', '.product-current-price .product-price'],
+        alternative: ['.product-price-not-vat'],
+        hiddenInputs: [],
+        dataAttributes: ['data-price', 'data-default-price']
+      },
+      '3dteknomarket.com': {
+        primary: ['#indirimliFiyat .spanFiyat', '.IndirimliFiyatContent .spanFiyat'],
+        alternative: ['.spanFiyat'],
+        hiddenInputs: [],
+        dataAttributes: [],
+        jsVariables: ['productDetailModel.productPriceStr', 'productDetailModel.productPriceKDVIncluded']
+      },
+      'robo90.com': {
+        primary: ['.d-discountPrice .product-price', '.product-price'],
+        alternative: [],
+        hiddenInputs: ['#urun-fiyat-kdvli'],
+        dataAttributes: []
+      },
+      'robolinkmarket.com': {
+        primary: ['.d-discountPrice .product-price', '.product-price'],
+        alternative: [],
+        hiddenInputs: ['#product-price-vat-include'],
+        dataAttributes: []
+      },
+      'robotistan.com': {
+        primary: ['.product-price'],
+        alternative: [],
+        hiddenInputs: ['#product-price-vat-include'],
+        dataAttributes: []
+      }
+    };
   }
 
   async init() {
@@ -47,11 +94,109 @@ class PriceScraper {
     }
   }
 
+  getSiteConfig(url) {
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      
+      // Exact match first
+      if (this.siteSpecificSelectors[hostname]) {
+        return this.siteSpecificSelectors[hostname];
+      }
+      
+      // Partial match for subdomains
+      for (const [domain, config] of Object.entries(this.siteSpecificSelectors)) {
+        if (hostname.includes(domain) || domain.includes(hostname.replace('www.', ''))) {
+          return config;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting site config:', error.message);
+      return null;
+    }
+  }
+
+  // Improved Turkish price format parser
+  extractPrice(text) {
+    if (!text) return null;
+    
+    console.log(`🔍 Fiyat çıkarma deneniyor: "${text}"`);
+    
+    // Clean the text first
+    let cleanText = text.toString().trim();
+    
+    // Remove currency symbols and "TL" text
+    cleanText = cleanText.replace(/[₺$€]/g, '').replace(/TL/gi, '').trim();
+    
+    // Turkish price format patterns
+    const patterns = [
+      // Standard Turkish format: 26.145,24 or 26.145,24 ₺
+      /(\d{1,3}(?:\.\d{3})+,\d{1,2})/,
+      // Simple decimal: 483,12
+      /(\d{1,4},\d{1,2})/,
+      // International format: 26,145.24
+      /(\d{1,3}(?:,\d{3})+\.\d{1,2})/,
+      // Thousands without decimal: 26.145 or 26,145
+      /(\d{1,3}(?:[\.,]\d{3})+)/,
+      // Simple number: 1234.56 or 1234,56
+      /(\d+[,\.]\d{1,2})/,
+      // Just integer: 1234
+      /(\d+)/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = cleanText.match(pattern);
+      if (match) {
+        let priceStr = match[1];
+        console.log(`📊 Pattern eşleşti: "${priceStr}"`);
+        
+        // Convert Turkish format to standard decimal
+        if (priceStr.includes('.') && priceStr.includes(',')) {
+          // Turkish format: 26.145,24 -> 26145.24
+          const lastCommaIndex = priceStr.lastIndexOf(',');
+          const afterComma = priceStr.substring(lastCommaIndex + 1);
+          if (afterComma.length <= 2) {
+            const beforeComma = priceStr.substring(0, lastCommaIndex);
+            priceStr = beforeComma.replace(/\./g, '') + '.' + afterComma;
+          }
+        } else if (priceStr.includes(',') && !priceStr.includes('.')) {
+          const parts = priceStr.split(',');
+          if (parts.length === 2 && parts[1].length <= 2 && parts[0].length <= 4) {
+            // Simple decimal: 483,12 -> 483.12
+            priceStr = parts[0] + '.' + parts[1];
+          } else {
+            // Thousands separator: 26,145 -> 26145
+            priceStr = priceStr.replace(/,/g, '');
+          }
+        } else if (priceStr.includes('.')) {
+          const parts = priceStr.split('.');
+          const lastPart = parts[parts.length - 1];
+          if (parts.length === 2 && lastPart.length <= 2 && parts[0].length <= 4) {
+            // Simple decimal: 483.12 -> keep as is
+          } else {
+            // Thousands separator: 26.145 -> 26145
+            priceStr = priceStr.replace(/\./g, '');
+          }
+        }
+        
+        const price = parseFloat(priceStr);
+        if (!isNaN(price) && price > 0 && price <= 10000000) {
+          console.log(`✅ Fiyat başarıyla çıkarıldı: ${price}`);
+          return price;
+        }
+      }
+    }
+    
+    console.log(`❌ Fiyat çıkarılamadı: "${text}"`);
+    return null;
+  }
+
   async scrapeProductWithAxios(url) {
     const startTime = Date.now();
     
     try {
-      console.log(`HTTP scraping: ${url}`);
+      console.log(`\n🌐 HTTP scraping başlatılıyor: ${url}`);
       
       const response = await Promise.race([
         axios.get(url, {
@@ -66,7 +211,7 @@ class PriceScraper {
           timeout: 20000,
           maxRedirects: 3,
           validateStatus: function (status) {
-            return status >= 200 && status < 300; // 404'leri reject et
+            return status >= 200 && status < 300;
           }
         }),
         new Promise((_, reject) => 
@@ -75,11 +220,9 @@ class PriceScraper {
       ]);
 
       const $ = cheerio.load(response.data);
-      
-      // Site-specific selector'lar
       const hostname = new URL(url).hostname;
       
-      // 404 veya ürün bulunamadı kontrolü
+      // 404 check
       const pageTitle = $('title').text();
       const bodyText = $('body').text();
       const pageTitleLower = pageTitle.toLowerCase();
@@ -104,116 +247,102 @@ class PriceScraper {
         };
       }
       
-      // Robotistan stok durumu kontrolü
-      if (hostname.includes('robotistan.com')) {
-        const outOfStockText = $('body').text();
-        if (outOfStockText.includes('Out Of Stock') || outOfStockText.includes('Stokta Yok')) {
-          console.log('⚠️ Robotistan - Ürün stokta yok');
-          // Stokta olmasa bile fiyatı çekmeye devam et
-        }
-      }
-      let siteSpecificSelectors = [];
-      
-      if (hostname.includes('dokuzkimya.com')) {
-        siteSpecificSelectors = [
-          '[itemprop="price"]',
-          '.product-price__price',
-          '.product-price .money',
-          '.price .money',
-          '.product-form__cart-submit .money',
-          '[data-price]',
-          '.price-item--sale .money',
-          '.money'
-        ];
-      } else if (hostname.includes('3dteknomarket.com')) {
-        siteSpecificSelectors = [
-          '.Formline.IndirimliFiyatContent .spanFiyat',
-          '.Formline.PiyasafiyatiContent .spanFiyat',
-          '.spanFiyat'
-        ];
-      } else if (hostname.includes('3dcim.com')) {
-        siteSpecificSelectors = [
-          '.price-current',
-          '.product-price',
-          '.price'
-        ];
-      } else if (hostname.includes('robotistan.com')) {
-        siteSpecificSelectors = [
-          '.product-price', // KDV dahil fiyat
-          '.product-price-not-vat', // KDV hariç fiyat
-          '.total_sale_price',
-          '.total_base_price',
-          '.sale_price'
-        ];
-      }
-
-      // Fiyat bulma
+      // Get site-specific configuration
+      const siteConfig = this.getSiteConfig(url);
       let price = null;
-      const priceSelectors = [
-        ...siteSpecificSelectors, // Site-specific önce
-        '.Formline.IndirimliFiyatContent .spanFiyat',
-        '.Formline.PiyasafiyatiContent .spanFiyat',
-        '.spanFiyat',
-        '.price', '.product-price', '.current-price', '.sale-price',
-        '.fiyat', '.tutar', '.amount', '.cost', '.value',
-        '.money', '.currency', '[data-price]'
-      ];
+      let extractionMethod = 'unknown';
       
-      // Robotistan için özel fiyat çekme
-      if (hostname.includes('robotistan.com')) {
-        // Önce KDV dahil fiyatı dene
-        const productPriceElement = $('.product-price').first();
-        if (productPriceElement.length) {
-          const priceText = productPriceElement.text().trim();
-          price = this.extractPrice(priceText);
-          if (price) {
-            console.log(`HTTP - Robotistan KDV dahil fiyat bulundu: ${price}`);
-          }
-        }
+      if (siteConfig) {
+        console.log(`🎯 Site-specific config bulundu: ${hostname}`);
         
-        // Bulamazsa JavaScript değişkeninden dene
-        if (!price) {
-          price = this.extractRobotistanPrice($, response.data);
-          if (price) {
-            console.log(`HTTP - Robotistan JavaScript ile fiyat bulundu: ${price}`);
-          }
-        }
-      }
-      
-      if (!price) {
-        for (const selector of priceSelectors) {
-          const element = $(selector).first();
-          if (element.length) {
-            let text = element.text().trim();
-            
-            // Dokuzkimya için özel işlem
-            if (hostname.includes('dokuzkimya.com') && selector === '[itemprop="price"]') {
-              const contentAttr = element.attr('content');
-              if (contentAttr) {
-                price = parseFloat(contentAttr);
-                if (price && price > 0) {
-                  console.log(`HTTP - Fiyat bulundu (content attribute): ${price}`);
+        // 1. Try data attributes first (highest priority)
+        if (siteConfig.dataAttributes && siteConfig.dataAttributes.length > 0) {
+          console.log('📊 Data attribute\'lar kontrol ediliyor...');
+          for (const attr of siteConfig.dataAttributes) {
+            const element = $(`[${attr}]`).first();
+            if (element.length) {
+              const attrValue = element.attr(attr);
+              if (attrValue) {
+                price = this.extractPrice(attrValue);
+                if (price) {
+                  extractionMethod = `data-attribute: ${attr}`;
+                  console.log(`✅ Data attribute ile fiyat bulundu: ${price} (${attr})`);
                   break;
                 }
               }
             }
-            
-            price = this.extractPrice(text);
-            if (price) {
-              console.log(`HTTP - Fiyat bulundu (${selector}): ${price}`);
-              break;
+          }
+        }
+        
+        // 2. Try primary selectors
+        if (!price && siteConfig.primary) {
+          console.log('🎯 Primary selector\'lar kontrol ediliyor...');
+          for (const selector of siteConfig.primary) {
+            const element = $(selector).first();
+            if (element.length) {
+              const text = element.text().trim();
+              price = this.extractPrice(text);
+              if (price) {
+                extractionMethod = `primary-selector: ${selector}`;
+                console.log(`✅ Primary selector ile fiyat bulundu: ${price} (${selector})`);
+                break;
+              }
+            }
+          }
+        }
+        
+        // 3. Try hidden inputs
+        if (!price && siteConfig.hiddenInputs && siteConfig.hiddenInputs.length > 0) {
+          console.log('🔒 Hidden input\'lar kontrol ediliyor...');
+          for (const inputSelector of siteConfig.hiddenInputs) {
+            const input = $(inputSelector).first();
+            if (input.length) {
+              const value = input.val() || input.attr('value');
+              if (value) {
+                price = this.extractPrice(value);
+                if (price) {
+                  extractionMethod = `hidden-input: ${inputSelector}`;
+                  console.log(`✅ Hidden input ile fiyat bulundu: ${price} (${inputSelector})`);
+                  break;
+                }
+              }
+            }
+          }
+        }
+        
+        // 4. Try alternative selectors
+        if (!price && siteConfig.alternative) {
+          console.log('🔄 Alternative selector\'lar kontrol ediliyor...');
+          for (const selector of siteConfig.alternative) {
+            const element = $(selector).first();
+            if (element.length) {
+              const text = element.text().trim();
+              price = this.extractPrice(text);
+              if (price) {
+                extractionMethod = `alternative-selector: ${selector}`;
+                console.log(`✅ Alternative selector ile fiyat bulundu: ${price} (${selector})`);
+                break;
+              }
             }
           }
         }
       }
       
-      // Akıllı fiyat bulma sistemi  
+      // 5. Fallback to general smart price finding
       if (!price) {
+        console.log('🔍 Genel akıllı fiyat arama başlatılıyor...');
         price = this.findSmartPrice($);
+        if (price) {
+          extractionMethod = 'smart-price-finder';
+          console.log(`✅ Akıllı fiyat bulucu ile fiyat bulundu: ${price}`);
+        }
       }
       
-      // Başlık
+      // Get title
       const title = $('title').text() || $('h1').first().text() || 'Ürün başlığı bulunamadı';
+      
+      const duration = Date.now() - startTime;
+      console.log(`⏱️ HTTP scraping tamamlandı (${duration}ms) - Fiyat: ${price || 'bulunamadı'} - Method: ${extractionMethod}`);
       
       return {
         url,
@@ -221,14 +350,15 @@ class PriceScraper {
         price: price,
         currency: 'TL',
         success: !!price,
-        method: 'HTTP'
+        method: 'HTTP',
+        extractionMethod,
+        duration
       };
       
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`HTTP scraping error for ${url} (${duration}ms):`, error.message);
+      console.error(`❌ HTTP scraping error for ${url} (${duration}ms):`, error.message);
       
-      // 404 veya ürün bulunamadı durumu
       if (error.response && error.response.status === 404) {
         return {
           url,
@@ -266,141 +396,79 @@ class PriceScraper {
       /kupon.*kod/i, /coupon.*code/i,
       /puan.*kazan/i, /bonus.*point/i,
       /taksit.*sayısı/i, /aylık.*ödeme/i,
-      /kdv.*dahil/i, /vat.*included/i,
       /komisyon.*oranı/i, /fee.*rate/i,
-      /window\./i, /function/i, /script/i, /style/i, // JavaScript/CSS içeriği
-      /\.css/i, /\.js/i, /src=/i, /href=/i, // HTML attributes
-      /@media/i, /font-family/i, /color:/i, // CSS properties
-      /performance.*mark/i, /console\./i, // Debug kodları
-      /googletagmanager/i, /analytics/i, /tracking/i // Analytics kodları
+      /window\./i, /function/i, /script/i, /style/i,
+      /\.css/i, /\.js/i, /src=/i, /href=/i,
+      /@media/i, /font-family/i, /color:/i,
+      /performance.*mark/i, /console\./i,
+      /googletagmanager/i, /analytics/i, /tracking/i
     ];
 
-    // Önce özel selector'larla ara
-    const specialSelectors = [
-      '[itemprop="price"]', // Dokuzkimya için content attribute
-      '.product-price__price', // Dokuzkimya için özel
+    // General selectors for fallback
+    const generalSelectors = [
       '.price', '.product-price', '.current-price', '.sale-price',
       '.fiyat', '.tutar', '.amount', '.cost', '.value',
       '[data-price]', '.money', '.currency',
-      '.product-amount', '.final-price', '.selling-price'
+      '.product-amount', '.final-price', '.selling-price',
+      '.price-current', '.price-item', '.price-wrapper'
     ];
 
-    specialSelectors.forEach(selector => {
+    // Try general selectors first
+    generalSelectors.forEach(selector => {
       $(selector).each((index, element) => {
         const $elem = $(element);
         const text = $elem.text().trim();
-        let priceValue = null;
         
-        // İtemprop price için content attribute kontrol et
-        if (selector === '[itemprop="price"]') {
-          const contentAttr = $elem.attr('content');
-          if (contentAttr) {
-            priceValue = parseFloat(contentAttr);
-            if (priceValue && priceValue >= 1) {
-              allPrices.push({
-                price: priceValue,
-                text: `content="${contentAttr}"`,
-                className: $elem.attr('class') || '',
-                tagName: element.tagName.toLowerCase(),
-                context: text,
-                priority: 'high',
-                selector: selector + ' (content)'
-              });
-              return; // Bu elemandan başka fiyat aramaya gerek yok
-            }
+        if (text.length > 200) return; // Skip long texts
+        
+        const price = this.extractPrice(text);
+        if (price && price >= 1 && price <= 1000000) {
+          const shouldExclude = excludePatterns.some(pattern => 
+            pattern.test(text) || pattern.test($elem.html() || '')
+          );
+          
+          if (!shouldExclude) {
+            allPrices.push({
+              price: price,
+              text: text.substring(0, 100),
+              className: $elem.attr('class') || '',
+              tagName: element.tagName.toLowerCase(),
+              selector: selector,
+              priority: 'high'
+            });
           }
-        }
-        
-        // Gelişmiş fiyat pattern'leri
-        const pricePatterns = [
-          /(\d{1,3}(?:\.\d{3})+,\d{1,2})\s*(?:TL|₺|tl|Tl)/gi, // 16.000,50 TL
-          /(\d{1,4},\d{1,2})\s*(?:TL|₺|tl|Tl)/gi, // 483,12 TL
-          /(\d{1,3}(?:,\d{3})+\.\d{1,2})\s*(?:TL|₺|tl|Tl)/gi, // 16,000.50 TL
-          /(\d{1,3}(?:[\.,]\d{3})*)\s*(?:TL|₺|tl|Tl)/gi, // 16.000 TL veya 16,000 TL
-          /(\d+)\s*(?:TL|₺|tl|Tl)/gi // 1234 TL
-        ];
-        
-        let priceMatches = [];
-        pricePatterns.forEach(pattern => {
-          const matches = text.match(pattern);
-          if (matches) {
-            priceMatches = priceMatches.concat(matches);
-          }
-        });
-        
-        if (priceMatches) {
-          priceMatches.forEach(match => {
-            const extractedPrice = this.extractPrice(match);
-            if (extractedPrice && extractedPrice >= 1) {
-              allPrices.push({
-                price: extractedPrice,
-                text: text.substring(0, 100),
-                className: $elem.attr('class') || '',
-                tagName: element.tagName.toLowerCase(),
-                context: text,
-                priority: 'high',
-                selector: selector
-              });
-            }
-          });
         }
       });
     });
 
-    // Eğer özel selector'lardan bulamazsak genel arama yap
+    // If no prices found with general selectors, scan all elements
     if (allPrices.length === 0) {
+      console.log('🔍 Genel selector\'larla fiyat bulunamadı, tüm elementler taranıyor...');
+      
       $('*').each((index, element) => {
         const $elem = $(element);
         const text = $elem.text().trim();
-        const html = $elem.html() || '';
         
-        // Skip if text is too long (probably contains lots of content)
         if (text.length > 200) return;
         
-        // Gelişmiş fiyat pattern'i - daha esnek
-        // Gelişmiş fiyat pattern'leri
-        const pricePatterns = [
-          /(\d{1,3}(?:\.\d{3})+,\d{1,2})\s*(?:TL|₺|tl|Tl)/gi, // 16.000,50 TL
-          /(\d{1,4},\d{1,2})\s*(?:TL|₺|tl|Tl)/gi, // 483,12 TL
-          /(\d{1,3}(?:,\d{3})+\.\d{1,2})\s*(?:TL|₺|tl|Tl)/gi, // 16,000.50 TL
-          /(\d{1,3}(?:[\.,]\d{3})*)\s*(?:TL|₺|tl|Tl)/gi, // 16.000 TL veya 16,000 TL
-          /(\d+)\s*(?:TL|₺|tl|Tl)/gi // 1234 TL
-        ];
-        
-        let priceMatches = [];
-        pricePatterns.forEach(pattern => {
-          const matches = text.match(pattern);
-          if (matches) {
-            priceMatches = priceMatches.concat(matches);
-          }
-        });
-        
-        if (priceMatches) {
-          priceMatches.forEach(match => {
-            const priceValue = this.extractPrice(match);
-            if (priceValue && priceValue >= 1) {
-              
-              // Daha akıllı dışlama - sadece kesin dışlanması gerekenleri dışla
-              const shouldExclude = excludePatterns.some(pattern => {
-                const textMatch = text.match(pattern);
-                const htmlMatch = html.match(pattern);
-                return textMatch || htmlMatch;
+        // Look for Turkish Lira indicators
+        if (text.includes('₺') || text.includes('TL') || text.includes('tl') || /\d+[.,]\d+/.test(text)) {
+          const price = this.extractPrice(text);
+          if (price && price >= 1 && price <= 1000000) {
+            const shouldExclude = excludePatterns.some(pattern => 
+              pattern.test(text) || pattern.test($elem.html() || '')
+            );
+            
+            if (!shouldExclude) {
+              allPrices.push({
+                price: price,
+                text: text.substring(0, 100),
+                className: $elem.attr('class') || '',
+                tagName: element.tagName.toLowerCase(),
+                priority: 'normal'
               });
-              
-              if (!shouldExclude) {
-                allPrices.push({
-                  price: priceValue,
-                  text: text.substring(0, 100),
-                  className: $elem.attr('class') || '',
-                  tagName: element.tagName.toLowerCase(),
-                  context: text,
-                  priority: 'normal'
-                });
-              } else {
-                console.log(`❌ Dışlandı: ${priceValue} TL - "${text.substring(0, 50)}..."`);
-              }
             }
-          });
+          }
         }
       });
     }
@@ -412,48 +480,19 @@ class PriceScraper {
 
     console.log(`🔍 ${allPrices.length} adet fiyat bulundu${allPrices.length > 5 ? ' (ilk 5 gösteriliyor)' : ''}:`);
     allPrices.slice(0, 5).forEach(p => {
-      console.log(`  💰 ${p.price} TL - ${p.className} - "${p.text.substring(0, 30)}..." (${p.priority || 'normal'})`);
+      console.log(`  💰 ${p.price} TL - ${p.className} - "${p.text.substring(0, 30)}..." (${p.priority})`);
     });
 
-    // Fiyat filtreleme ve seçimi - daha esnek
-    let filteredPrices = allPrices.filter(p => {
-      // Çok düşük fiyatları dışla (muhtemelen hata) - limiti düşürdük
-      if (p.price < 1) return false;
-      
-      // Çok yüksek fiyatları dışla (muhtemelen hata)
-      if (p.price > 1000000) return false;
-      
-      return true;
-    });
-
-    if (filteredPrices.length === 0) {
-      console.log('❌ Filtreleme sonrası hiç fiyat kalmadı');
-      return allPrices.length > 0 ? allPrices[0].price : null;
-    }
-
-    // Önce yüksek öncelikli fiyatları kontrol et
-    const highPriorityPrices = filteredPrices.filter(p => p.priority === 'high');
+    // Prioritize high priority prices
+    const highPriorityPrices = allPrices.filter(p => p.priority === 'high');
     if (highPriorityPrices.length > 0) {
-      console.log(`✅ Özel selector ile bulundu: ${highPriorityPrices[0].price} TL (${highPriorityPrices[0].selector})`);
+      console.log(`✅ Yüksek öncelikli fiyat seçildi: ${highPriorityPrices[0].price} TL`);
       return highPriorityPrices[0].price;
     }
 
-    // Sonra öncelik sırası: product, price, fiyat class'ları
-    const priorityClasses = ['product', 'price', 'fiyat', 'cost', 'amount', 'value', 'money'];
-    
-    for (const priorityClass of priorityClasses) {
-      const priorityPrice = filteredPrices.find(p => 
-        p.className.toLowerCase().includes(priorityClass)
-      );
-      if (priorityPrice) {
-        console.log(`✅ Öncelikli class ile bulundu: ${priorityPrice.price} TL (${priorityClass})`);
-        return priorityPrice.price;
-      }
-    }
-
-    // En sık geçen fiyatı bul (aynı fiyat birden fazla yerde varsa)
+    // Find most frequent price
     const priceFreq = {};
-    filteredPrices.forEach(p => {
+    allPrices.forEach(p => {
       priceFreq[p.price] = (priceFreq[p.price] || 0) + 1;
     });
     
@@ -465,171 +504,17 @@ class PriceScraper {
       return parseFloat(mostFrequentPrice[0]);
     }
 
-    // Son çare: En büyük fiyatı al (genellikle ürün fiyatı en yüksektir)
-    const highestPrice = Math.max(...filteredPrices.map(p => p.price));
+    // Return highest price as last resort
+    const highestPrice = Math.max(...allPrices.map(p => p.price));
     console.log(`✅ En yüksek fiyat seçildi: ${highestPrice} TL`);
     return highestPrice;
-  }
-
-  extractRobotistanPrice($, html) {
-    console.log('🤖 Robotistan fiyat çekme başlatılıyor...');
-    
-    try {
-      // PRODUCT_DATA JavaScript değişkenini bul
-      const productDataMatch = html.match(/var\s+PRODUCT_DATA\s*=\s*(\[.*?\]);/s);
-      if (productDataMatch) {
-        const productData = JSON.parse(productDataMatch[1]);
-        if (productData && productData[0]) {
-          const product = productData[0];
-          
-          // Öncelik sırası: total_sale_price > total_base_price > sale_price
-          if (product.total_sale_price) {
-            console.log('✅ Robotistan - total_sale_price bulundu:', product.total_sale_price);
-            return parseFloat(product.total_sale_price);
-          } else if (product.total_base_price) {
-            console.log('✅ Robotistan - total_base_price bulundu:', product.total_base_price);
-            return parseFloat(product.total_base_price);
-          } else if (product.sale_price) {
-            // sale_price KDV'siz fiyat, %20 KDV ekle
-            const priceWithVat = parseFloat(product.sale_price) * 1.20;
-            console.log('✅ Robotistan - sale_price + KDV:', priceWithVat);
-            return priceWithVat;
-          }
-        }
-      }
-      
-      // Alternatif: HTML içinde "İndirimli Fiyat:" ara
-      const discountPriceMatch = html.match(/İndirimli\s*Fiyat:\s*([\d,\.]+)\s*TL/i);
-      if (discountPriceMatch) {
-        const price = this.extractPrice(discountPriceMatch[0]);
-        if (price) {
-          console.log('✅ Robotistan - İndirimli fiyat bulundu:', price);
-          return price;
-        }
-      }
-      
-      // Son çare: Genel fiyat pattern'leri
-      const pricePatterns = [
-        /İndirimli\s*Fiyat:\s*([\d,\.]+)\s*TL/gi, // İndirimli Fiyat: 133,685.68 TL
-        /([\d,\.]+)\s*TL(?!\s*\+\s*(?:VAT|KDV))/gi, // TL (KDV dahil)
-        /Fiyat:\s*([\d,\.]+)\s*TL/gi
-      ];
-      
-      let allPrices = [];
-      for (const pattern of pricePatterns) {
-        const matches = html.match(pattern);
-        if (matches) {
-          for (const match of matches) {
-            const price = this.extractPrice(match);
-            if (price && price > 100) { // Robotistan'da çok düşük fiyatlı ürün yok
-              allPrices.push(price);
-            }
-          }
-        }
-      }
-      
-      // En yüksek fiyatı al (genellikle KDV dahil fiyat)
-      if (allPrices.length > 0) {
-        const maxPrice = Math.max(...allPrices);
-        console.log(`✅ Robotistan - Bulunan fiyatlar: ${allPrices.join(', ')} - En yüksek: ${maxPrice}`);
-        return maxPrice;
-      }
-    } catch (error) {
-      console.error('❌ Robotistan fiyat çekme hatası:', error.message);
-    }
-    
-    return null;
-  }
-  
-  extractPrice(text) {
-    if (!text) return null;
-    
-    // Önce sadece sayı ve TL/₺ olan kısımları ayıkla
-    const cleanText = text.replace(/[^\d.,₺TLtl\s]/g, '').trim();
-    
-    const patterns = [
-      // Türkçe format binlik noktalı: 16.000,50 TL veya 16.000 TL
-      /(\d{1,3}(?:\.\d{3})+,\d{1,2})\s*(?:TL|₺|tl|Tl)/i,
-      /(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺|tl|Tl)/i,
-      // Basit ondalık: 483,12 TL
-      /(\d{1,4},\d{1,2})\s*(?:TL|₺|tl|Tl)/i,
-      // International format: 16,000.50 TL veya 16,000 TL  
-      /(\d{1,3}(?:,\d{3})+\.\d{1,2})\s*(?:TL|₺|tl|Tl)/i,
-      /(\d{1,3}(?:,\d{3})+)\s*(?:TL|₺|tl|Tl)/i,
-      // Robotistan format: 133,685.68 TL
-      /(\d{1,3},\d{3}\.\d{1,2})\s*(?:TL|₺|tl|Tl)/i,
-      // Dokuzkimya format: 16,000.00TL (boşluksuz)
-      /(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)(?:TL|₺|tl|Tl)/i,
-      // Basit sayı: 1234 TL
-      /(\d+)\s*(?:TL|₺|tl|Tl)/i,
-      // Sadece sayı kısmı (son çare)
-      /(\d{1,3}(?:[\.,]\d{3})*(?:[,\.]\d{1,2})?)/
-    ];
-    
-    for (let pattern of patterns) {
-      const match = text.match(pattern) || cleanText.match(pattern);
-      if (match) {
-        let price = match[1];
-        
-        // Fiyat formatını normalize et - daha akıllı yaklaşım
-        if (price.includes('.') && price.includes(',')) {
-          // Hangisi son konumda ise o ondalık ayırıcıdır
-          const lastDotIndex = price.lastIndexOf('.');
-          const lastCommaIndex = price.lastIndexOf(',');
-          
-          if (lastCommaIndex > lastDotIndex) {
-            // Türkçe format: 16.000,50 -> 16000.50
-            const afterComma = price.substring(lastCommaIndex + 1);
-            if (afterComma.length <= 2) {
-              const beforeComma = price.substring(0, lastCommaIndex);
-              price = beforeComma.replace(/\./g, '') + '.' + afterComma;
-            }
-          } else {
-            // International format: 16,000.50 -> 16000.50
-            const afterDot = price.substring(lastDotIndex + 1);
-            if (afterDot.length <= 2) {
-              const beforeDot = price.substring(0, lastDotIndex);
-              price = beforeDot.replace(/,/g, '') + '.' + afterDot;
-            }
-          }
-        } else if (price.includes(',') && !price.includes('.')) {
-          const parts = price.split(',');
-          if (parts.length === 2 && parts[1].length <= 2 && parts[0].length <= 4) {
-            // Basit ondalık: 483,12 -> 483.12
-            price = parts[0] + '.' + parts[1];
-          } else {
-            // Binlik ayırıcı: 16,000 -> 16000
-            price = price.replace(/,/g, '');
-          }
-        } else if (price.includes('.')) {
-          const parts = price.split('.');
-          const lastPart = parts[parts.length - 1];
-          if (parts.length === 2 && lastPart.length <= 2 && parts[0].length <= 4) {
-            // Basit ondalık: 483.12
-            price = price;
-          } else {
-            // Binlik ayırıcı: 16.000 -> 16000
-            price = price.replace(/\./g, '');
-          }
-        }
-        
-        const numPrice = parseFloat(price);
-        if (!isNaN(numPrice) && numPrice > 0) {
-          // Mantıklı fiyat aralığında mı kontrol et
-          if (numPrice >= 0.01 && numPrice <= 10000000) {
-            return numPrice;
-          }
-        }
-      }
-    }
-    return null;
   }
 
   async scrapeProduct(url) {
     console.log(`\n=== SCRAPING: ${url} ===`);
     
-    // Önce HTTP/Cheerio ile dene (daha hızlı ve stabil)
-    console.log('1. HTTP/Cheerio yöntemi deneniyor...');
+    // Try HTTP/Cheerio first (faster and more stable)
+    console.log('1️⃣ HTTP/Cheerio yöntemi deneniyor...');
     const httpResult = await this.scrapeProductWithAxios(url);
     
     if (httpResult.success) {
@@ -639,7 +524,7 @@ class PriceScraper {
     
     console.log('❌ HTTP yöntemi başarısız, Puppeteer deneniyor...');
     
-    // HTTP başarısızsa Puppeteer ile dene
+    // If HTTP fails, try Puppeteer
     return await this.scrapeProductWithPuppeteer(url);
   }
   
@@ -665,14 +550,12 @@ class PriceScraper {
         console.error('Page JavaScript error:', error.message);
       });
       
-      // Daha gelişmiş bot koruma atlatma
+      // Enhanced bot protection bypass
       await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       await page.setViewport({ width: 1920, height: 1080 });
-      
-      // JavaScript etkinleştir
       await page.setJavaScriptEnabled(true);
       
-      // Sayfayı yükle - timeout ve retry logic
+      // Load page with retry logic
       let retries = 3;
       let lastError;
       
@@ -697,29 +580,26 @@ class PriceScraper {
         throw lastError;
       }
       
-      // JavaScript'in çalışması için bekle - timeout kontrollü
+      // Wait for JavaScript to execute
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Sayfanın hala aktif olduğunu kontrol et
       if (page.isClosed()) {
         throw new Error('Sayfa kapatıldı');
       }
       
-      // Timeout kontrolü
       if (Date.now() - startTime > 25000) {
         throw new Error('Scraping timeout reached');
       }
       
-      // Debug: Sayfa içeriğini kontrol et
-      const pageContent = await page.content();
-      console.log(`Sayfa boyutu: ${pageContent.length} karakter`);
+      // Pass site-specific selectors to page context
+      const siteConfig = this.getSiteConfig(url);
       
-      const productData = await page.evaluate(() => {
+      const productData = await page.evaluate((siteSelectors) => {
         console.log('=== PUPPETEER FIYAT ARAMA ===');
         console.log('Sayfa URL:', window.location.href);
         console.log('Sayfa başlığı:', document.title);
         
-        // 404 kontrolü
+        // 404 check
         const pageTitle = document.title;
         const bodyText = document.body.innerText || document.body.textContent || '';
         
@@ -738,145 +618,165 @@ class PriceScraper {
             error: 'Product not found (404)'
           };
         }
-        const selectors = {
-          price: [
-            // Özel site için öncelikli selector'lar
-            '.Formline.IndirimliFiyatContent .spanFiyat',
-            '.Formline.PiyasafiyatiContent .spanFiyat',
-            '.IndirimliFiyatContent .spanFiyat',
-            '.PiyasafiyatiContent .spanFiyat',
-            '.spanFiyat',
-            
-            // Genel selector'lar
-            '.price',
-            '.product-price',
-            '.current-price',
-            '.sale-price',
-            '.price-current',
-            '[data-price]',
-            '.amount',
-            '.cost',
-            '.value',
-            '.price-tag',
-            '.product-price-value',
-            '.sale-price-value',
-            '.current-price-value',
-            '.price-amount',
-            '.product-amount',
-            '.final-price',
-            '.selling-price',
-            '.discount-price',
-            '.regular-price',
-            '.list-price',
-            '.unit-price',
-            '.product-cost',
-            '.item-price',
-            '.offer-price',
-            '.special-price',
-            '.now-price',
-            '.current-amount',
-            '.product-value',
-            '.price-display',
-            '.price-info',
-            '.price-wrapper',
-            '.money',
-            '.currency',
-            '.tl',
-            '.lira',
-            '.fiyat',
-            '.tutar',
-            '.ucret',
-            '.bedel',
-            '.miktar',
-            '.deger',
-            '.para',
-            '.ödeme',
-            '.satis-fiyati',
-            '.guncel-fiyat',
-            '.indirimi-fiyat',
-            '.kampanya-fiyati',
-            '.ozel-fiyat',
-            '.normal-fiyat',
-            '.liste-fiyati',
-            '.birim-fiyat',
-            '.son-fiyat',
-            '.net-fiyat',
-            '.brüt-fiyat',
-            '.kdv-dahil',
-            '.kdv-hariç'
-          ],
-          title: [
-            'h1',
-            '.product-title',
-            '.product-name',
-            '.title',
-            '[data-title]',
-            '.product-heading',
-            '.item-title',
-            '.product-info h1',
-            '.product-info h2',
-            '.product-detail h1',
-            '.product-detail h2',
-            '.urun-adi',
-            '.urun-baslik',
-            '.product-ad',
-            '.item-name',
-            '.product-label'
-          ]
-        };
 
-        function findElement(selectorArray) {
-          for (let selector of selectorArray) {
-            const element = document.querySelector(selector);
-            if (element) return element;
-          }
-          return null;
-        }
-
+        // Enhanced price extraction function
         function extractPrice(text) {
           if (!text) return null;
           
-          // Türkçe fiyat formatları için regex
+          console.log(`🔍 Fiyat çıkarma deneniyor: "${text}"`);
+          
+          let cleanText = text.toString().trim();
+          cleanText = cleanText.replace(/[₺$€]/g, '').replace(/TL/gi, '').trim();
+          
           const patterns = [
-            /(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*(?:TL|₺|tl|Tl)/i,
-            /(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/,
-            /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/,
-            /(\d+(?:[.,]\d{2})?)/
+            /(\d{1,3}(?:\.\d{3})+,\d{1,2})/,
+            /(\d{1,4},\d{1,2})/,
+            /(\d{1,3}(?:,\d{3})+\.\d{1,2})/,
+            /(\d{1,3}(?:[\.,]\d{3})+)/,
+            /(\d+[,\.]\d{1,2})/,
+            /(\d+)/
           ];
           
-          for (let pattern of patterns) {
-            const match = text.match(pattern);
+          for (const pattern of patterns) {
+            const match = cleanText.match(pattern);
             if (match) {
-              let price = match[1];
-              // Türkçe format: 1.234,56 -> 1234.56
-              if (price.includes('.') && price.includes(',')) {
-                price = price.replace(/\./g, '').replace(',', '.');
-              }
-              // Sadece virgül varsa: 1234,56 -> 1234.56
-              else if (price.includes(',') && !price.includes('.')) {
-                price = price.replace(',', '.');
-              }
-              // Sadece nokta varsa ve 3 haneli gruplar halinde: 1.234 -> 1234
-              else if (price.includes('.') && price.length > 4) {
-                price = price.replace(/\./g, '');
+              let priceStr = match[1];
+              
+              if (priceStr.includes('.') && priceStr.includes(',')) {
+                const lastCommaIndex = priceStr.lastIndexOf(',');
+                const afterComma = priceStr.substring(lastCommaIndex + 1);
+                if (afterComma.length <= 2) {
+                  const beforeComma = priceStr.substring(0, lastCommaIndex);
+                  priceStr = beforeComma.replace(/\./g, '') + '.' + afterComma;
+                }
+              } else if (priceStr.includes(',') && !priceStr.includes('.')) {
+                const parts = priceStr.split(',');
+                if (parts.length === 2 && parts[1].length <= 2 && parts[0].length <= 4) {
+                  priceStr = parts[0] + '.' + parts[1];
+                } else {
+                  priceStr = priceStr.replace(/,/g, '');
+                }
+              } else if (priceStr.includes('.')) {
+                const parts = priceStr.split('.');
+                const lastPart = parts[parts.length - 1];
+                if (parts.length === 2 && lastPart.length <= 2 && parts[0].length <= 4) {
+                  // Keep as is
+                } else {
+                  priceStr = priceStr.replace(/\./g, '');
+                }
               }
               
-              const numPrice = parseFloat(price);
-              if (!isNaN(numPrice) && numPrice > 0) {
-                return numPrice;
+              const price = parseFloat(priceStr);
+              if (!isNaN(price) && price > 0 && price <= 10000000) {
+                console.log(`✅ Fiyat başarıyla çıkarıldı: ${price}`);
+                return price;
               }
             }
           }
+          
           return null;
         }
 
-        const titleElement = findElement(selectors.title);
-        
         let price = null;
+        let extractionMethod = 'unknown';
         
-        // Akıllı fiyat bulma sistemi
-        function findAllPrices() {
-          const allPrices = [];
+        // Use site-specific selectors if available
+        if (siteSelectors) {
+          console.log('🎯 Site-specific selectors kullanılıyor');
+          
+          // Try data attributes first
+          if (siteSelectors.dataAttributes) {
+            for (const attr of siteSelectors.dataAttributes) {
+              const element = document.querySelector(`[${attr}]`);
+              if (element) {
+                const attrValue = element.getAttribute(attr);
+                if (attrValue) {
+                  price = extractPrice(attrValue);
+                  if (price) {
+                    extractionMethod = `data-attribute: ${attr}`;
+                    console.log(`✅ Data attribute ile fiyat bulundu: ${price}`);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          
+          // Try primary selectors
+          if (!price && siteSelectors.primary) {
+            for (const selector of siteSelectors.primary) {
+              const element = document.querySelector(selector);
+              if (element) {
+                price = extractPrice(element.textContent);
+                if (price) {
+                  extractionMethod = `primary-selector: ${selector}`;
+                  console.log(`✅ Primary selector ile fiyat bulundu: ${price}`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Try hidden inputs
+          if (!price && siteSelectors.hiddenInputs) {
+            for (const inputSelector of siteSelectors.hiddenInputs) {
+              const input = document.querySelector(inputSelector);
+              if (input) {
+                const value = input.value || input.getAttribute('value');
+                if (value) {
+                  price = extractPrice(value);
+                  if (price) {
+                    extractionMethod = `hidden-input: ${inputSelector}`;
+                    console.log(`✅ Hidden input ile fiyat bulundu: ${price}`);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          
+          // Try alternative selectors
+          if (!price && siteSelectors.alternative) {
+            for (const selector of siteSelectors.alternative) {
+              const element = document.querySelector(selector);
+              if (element) {
+                price = extractPrice(element.textContent);
+                if (price) {
+                  extractionMethod = `alternative-selector: ${selector}`;
+                  console.log(`✅ Alternative selector ile fiyat bulundu: ${price}`);
+                  break;
+                }
+              }
+            }
+          }
+        }
+        
+        // Fallback to general search
+        if (!price) {
+          console.log('🔍 Genel fiyat arama başlatılıyor...');
+          
+          const generalSelectors = [
+            '.price', '.product-price', '.current-price', '.sale-price',
+            '.fiyat', '.tutar', '.amount', '.cost', '.value',
+            '[data-price]', '.money', '.currency'
+          ];
+          
+          for (const selector of generalSelectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+              price = extractPrice(element.textContent);
+              if (price) {
+                extractionMethod = `general-selector: ${selector}`;
+                console.log(`✅ Genel selector ile fiyat bulundu: ${price}`);
+                break;
+              }
+            }
+          }
+        }
+        
+        // Last resort: scan all elements
+        if (!price) {
+          console.log('🔍 Tüm elementler taranıyor...');
           const allElements = document.querySelectorAll('*');
           
           for (let element of allElements) {
@@ -884,130 +784,39 @@ class PriceScraper {
             if (text && (text.includes('₺') || text.includes('TL') || text.includes('tl'))) {
               const extractedPrice = extractPrice(text);
               if (extractedPrice && extractedPrice > 0) {
-                allPrices.push({
-                  price: extractedPrice,
-                  element: element,
-                  text: text.trim(),
-                  className: element.className,
-                  tagName: element.tagName
-                });
+                price = extractedPrice;
+                extractionMethod = 'element-scan';
+                console.log(`✅ Element tarama ile fiyat bulundu: ${price}`);
+                break;
               }
-            }
-          }
-          
-          return allPrices;
-        }
-        
-        // Önce özel site kontrolü
-        const discountedElement = document.querySelector('.Formline.IndirimliFiyatContent .spanFiyat');
-        if (discountedElement) {
-          price = extractPrice(discountedElement.textContent);
-          console.log('Özel site - İndirimli fiyat:', price);
-        }
-        
-        if (!price) {
-          const normalElement = document.querySelector('.Formline.PiyasafiyatiContent .spanFiyat');
-          if (normalElement) {
-            price = extractPrice(normalElement.textContent);
-            console.log('Özel site - Normal fiyat:', price);
-          }
-        }
-        
-        // Genel yaklaşım - tüm fiyatları bul
-        if (!price) {
-          const priceElement = findElement(selectors.price);
-          if (priceElement) {
-            price = extractPrice(priceElement.textContent);
-            console.log('Selector ile fiyat:', price);
-          }
-        }
-        
-        // Akıllı fiyat bulma
-        if (!price) {
-          const allPrices = findAllPrices();
-          console.log('Bulunan tüm fiyatlar:', allPrices.map(p => `${p.price} TL (${p.className})`));
-          
-          if (allPrices.length > 0) {
-            // Fiyatları filtrele (1 TL - 1,000,000 TL arası)
-            const validPrices = allPrices.filter(p => p.price >= 1 && p.price <= 1000000);
-            console.log('Geçerli fiyatlar:', validPrices.map(p => p.price));
-            
-            if (validPrices.length > 0) {
-              // En düşük fiyatı seç (genellikle indirimli fiyat)
-              validPrices.sort((a, b) => a.price - b.price);
-              price = validPrices[0].price;
-              console.log('Akıllı sistem - En düşük fiyat:', price);
-            }
-          } else {
-            console.log('Hiçbir fiyat bulunamadı! Sayfa içeriği kontrol edilmeli.');
-            // Sayfadaki tüm sayıları bul
-            const allNumbers = document.body.textContent.match(/\d+[.,]\d+/g);
-            console.log('Sayfadaki tüm sayılar:', allNumbers);
-          }
-        }
-        
-        if (!price) {
-          // Tüm elementleri tara ve fiyat içeren metinleri bul
-          const allElements = document.querySelectorAll('*');
-          let foundPrices = [];
-          
-          for (let element of allElements) {
-            const text = element.textContent;
-            if (text && (text.includes('₺') || text.includes('TL') || text.includes('tl') || /\d+[.,]\d{2}/.test(text))) {
-              const extractedPrice = extractPrice(text);
-              if (extractedPrice && extractedPrice > 0 && extractedPrice < 1000000) {
-                foundPrices.push({
-                  price: extractedPrice,
-                  element: element,
-                  text: text.trim()
-                });
-              }
-            }
-          }
-          
-          // En büyük fiyatı al (genellikle ana fiyat)
-          if (foundPrices.length > 0) {
-            foundPrices.sort((a, b) => b.price - a.price);
-            price = foundPrices[0].price;
-          }
-        }
-        
-        // Eğer hala fiyat bulunamadıysa, farklı yaklaşım dene
-        if (!price) {
-          const priceTexts = document.evaluate(
-            "//text()[contains(., '₺') or contains(., 'TL') or contains(., 'tl')]",
-            document,
-            null,
-            XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE,
-            null
-          );
-          
-          for (let i = 0; i < priceTexts.snapshotLength; i++) {
-            const textNode = priceTexts.snapshotItem(i);
-            const extractedPrice = extractPrice(textNode.textContent);
-            if (extractedPrice && extractedPrice > 0) {
-              price = extractedPrice;
-              break;
             }
           }
         }
 
+        const titleElement = document.querySelector('h1') || document.querySelector('title');
+        
         return {
           title: titleElement ? titleElement.textContent.trim() : 'Ürün başlığı bulunamadı',
           price: price,
-          currency: 'TL'
+          currency: 'TL',
+          extractionMethod: extractionMethod
         };
-      });
+      }, siteConfig);
+
+      const duration = Date.now() - startTime;
+      console.log(`⏱️ Puppeteer scraping tamamlandı (${duration}ms) - Fiyat: ${productData.price || 'bulunamadı'}`);
 
       return {
         url,
         ...productData,
         success: !productData.notFound && !!productData.price,
-        method: 'Puppeteer'
+        method: 'Puppeteer',
+        duration
       };
       
     } catch (error) {
-      console.error(`${url} için hata:`, error.message);
+      const duration = Date.now() - startTime;
+      console.error(`❌ ${url} için Puppeteer hatası (${duration}ms):`, error.message);
       return {
         url,
         title: 'Puppeteer Hatası',
@@ -1015,7 +824,8 @@ class PriceScraper {
         currency: 'TL',
         success: false,
         error: error.message,
-        method: 'Puppeteer'
+        method: 'Puppeteer',
+        duration
       };
     } finally {
       if (page && !page.isClosed()) {
@@ -1040,14 +850,14 @@ class PriceScraper {
 
   async scrapeMultipleProducts(urls) {
     const results = [];
-    const maxConcurrent = 2; // Limit concurrent requests
+    const maxConcurrent = 2;
     
     for (let i = 0; i < urls.length; i += maxConcurrent) {
       const batch = urls.slice(i, i + maxConcurrent);
       
       const batchResults = await Promise.allSettled(
         batch.map(async (url) => {
-          console.log(`Scraping: ${url}`);
+          console.log(`\n🚀 Scraping başlatılıyor: ${url}`);
           return await this.scrapeProduct(url);
         })
       );
