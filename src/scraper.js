@@ -21,23 +21,24 @@ class PriceScraper {
         primary: [
           '.price-item--sale .money', 
           '.price__sale .money', 
+          '.price-item--last .money',
           '.price-item .money',
           '.price .money',
           '.money'
         ],
         alternative: [
           '.price__container .money', 
-          '[data-price] .money', 
           '.price-item--regular', 
-          '.price-item--last',
+          '.price-item--regular .money',
           '.price-wrapper .money',
           '.product-price .money',
           'span[data-product-price]',
           '.price-current',
-          '.current-price'
+          '.current-price',
+          '.price-item--sale',
+          '.price-item--last'
         ],
-        hiddenInputs: [],
-        dataAttributes: ['data-product-price', 'data-price']
+        hiddenInputs: []
       },
       'store.metatechtr.com': {
         primary: ['.product-price', '.product-current-price .product-price'],
@@ -440,9 +441,10 @@ class PriceScraper {
       '[data-price]', '.money', '.currency',
       '.product-amount', '.final-price', '.selling-price',
       '.price-current', '.price-item', '.price-wrapper',
-      '.price-item--regular', '.price-item--last',
+      '.price-item--regular', '.price-item--last', '.price-item--regular .money', '.price-item--last .money',
       '.price-item--sale', '.price__sale', '.price__container',
-      'span[data-product-price]', '[data-product-price]'
+      'span[data-product-price]', '[data-product-price]',
+      '.price-item--sale .money', '.price-item .money'
     ];
 
     // Try general selectors first
@@ -793,7 +795,8 @@ class PriceScraper {
             '.price', '.product-price', '.current-price', '.sale-price',
             '.fiyat', '.tutar', '.amount', '.cost', '.value', '.money', '.currency',
             '.price-item--regular', '.price-item--last', '.price-item',
-            '.price-item--sale', '.price__sale', '.price__container',
+            '.price-item--sale', '.price__sale', '.price__container', 
+            '.price-item--regular .money', '.price-item--last .money', '.price-item--sale .money', '.price-item .money',
             'span[data-product-price]', '[data-product-price]'
           ];
           
