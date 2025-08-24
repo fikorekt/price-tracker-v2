@@ -908,6 +908,9 @@ class PriceScraper {
     let page = null;
     const startTime = Date.now();
     
+    // Determine if this is a Bambu Lab product
+    const isBambuLab = url.toLowerCase().includes('bambu-lab') || url.toLowerCase().includes('bambulab');
+    
     try {
       await this.init();
       
@@ -970,7 +973,7 @@ class PriceScraper {
       // Pass site-specific selectors to page context
       const siteConfig = this.getSiteConfig(url);
       
-      const productData = await page.evaluate((siteSelectors) => {
+      const productData = await page.evaluate((siteSelectors, isBambuLab) => {
         console.log('=== PUPPETEER FIYAT ARAMA ===');
         console.log('Sayfa URL:', window.location.href);
         console.log('Sayfa başlığı:', document.title);
@@ -1186,7 +1189,7 @@ class PriceScraper {
           currency: 'TL',
           extractionMethod: extractionMethod
         };
-      }, siteConfig);
+      }, siteConfig, isBambuLab);
 
       const duration = Date.now() - startTime;
       console.log(`⏱️ Puppeteer scraping tamamlandı (${duration}ms) - Fiyat: ${productData.price || 'bulunamadı'}`);
