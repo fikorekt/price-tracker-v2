@@ -526,6 +526,7 @@ class PriceScraper {
       '.product-price-wrap .money',
       '.price-list .money',
       '.variant-price .money'
+    ];
 
     // Try general selectors first
     generalSelectors.forEach(selector => {
