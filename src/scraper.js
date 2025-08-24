@@ -252,6 +252,11 @@ class PriceScraper {
       const isBambuLab = url.toLowerCase().includes('bambu-lab') || url.toLowerCase().includes('bambulab');
       if (isBambuLab) {
         console.log('🎯 BAMBU LAB ÜRÜNÜ TESPİT EDİLDİ - Özel debug modu aktif');
+        
+        // Sayfa içeriğinin bir kısmını logla
+        const bodyText = response.data.substring(0, 2000);
+        console.log('📄 BAMBU LAB - Sayfa içeriği (ilk 2000 karakter):');
+        console.log(bodyText);
       }
       
       const response = await Promise.race([
